@@ -1,0 +1,39 @@
+<!--交易统计区域-->
+<table th:fragment="html" v-for="t_data in result" class="table table-bordered table-condensed">
+    <thead>
+    <th align="center" colspan="2">趋势投资盈亏统计</th>
+    </thead>
+    <tbody>
+    <tr> <!--均线：ma 购买阈值：analyse_buyRate  出售阈值：analyse_sellRate-->
+        <td width="50%">投资分析标准量</td>
+        <td><button  type="button" class="btn btn btn-sm btn-success">MA(均线) :{{t_data.ma}}</button>
+            <button  type="button" class="btn btn btn-sm btn-info">购买阈值 :{{t_data.analyse_buyRate}}</button>
+            <button  type="button" class="btn btn btn-sm btn-warning">出售阈值 :{{t_data.analyse_sellRate}}</button>
+        </td>
+    </tr>
+    <tr>
+        <td width="50%">总共交易次数</td>
+        <td>{{t_data.winCount+t_data.lossCount}}</td>
+    </tr>
+    <tr>
+        <td>盈利交易次数</td>
+        <td>{{t_data.winCount}}</td>
+    </tr>
+    <tr>
+        <td>平均盈利比率</td>
+        <td>{{t_data.avgWinRate*100|formatNumberFilter(2)}}%</td>
+    </tr>
+    <tr>
+        <td>亏损交易次数</td>
+        <td>{{t_data.lossCount}}</td>
+    </tr>
+    <tr>
+        <td>平均亏损比率</td>
+        <td>{{t_data.avgLossRate*100|formatNumberFilter(2)}}%</td>
+    </tr>
+    <tr>
+        <td>胜率</td>
+        <td>{{(t_data.winCount/(t_data.winCount+t_data.lossCount))*100|formatNumberFilter(2)}}%	</td>
+    </tr>
+    </tbody>
+</table>

@@ -1,0 +1,21 @@
+<table th:fragment="html" class="table table-striped table-bordered table-condensed" >
+    <!--收益分布对比表-->
+    <thead>
+    <th>年份</th>
+    <th>指数收益</th>
+    <th>趋势投资收益</th>
+    </thead>
+    <tbody>
+    <tr v-for="bean in annualProfits">
+        <td>
+            {{bean.year}}
+        </td>
+        <td>
+            {{bean.indexIncome*100|formatNumberFilter(2)}}%
+        </td>
+        <td>
+            {{bean.trendIncome*100|formatNumberFilter(2)}}%
+        </td>
+    </tr>
+    </tbody>
+</table>

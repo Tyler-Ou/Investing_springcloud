@@ -1,0 +1,39 @@
+<table  th:fragment="html" class="inputTable ">
+    <tr> <!--第一行 指数选择-->
+        <td width="25%">
+                <span data-toggle="tooltip" data-placement="top" title="选择某一个指数进行模拟回测">
+                    请选择指数:<span class="glyphicon glyphicon-question-sign" > </span>
+                </span>
+        </td>
+
+        <!--读出对应的指数数据 其中data-toggle="tooltip" data-placement="right"  鼠标悬停提示效果-->
+        <td width="25%">
+            <!--在Select上双向绑定的属性为currentIndex，值为option中的value，即bean.code-->
+            <!--绑定一个@chang即当下拉框选择以后，再次调用vue.回调，以再次请求刷新数据-->
+            <!--要想设置select标签下默认的option，vue.js的做法是，在select上双向绑定的值与某个option的value一致时，该option即为默认 -->
+            <select   @change="changeParamWithFlushDate"  v-model="currentIndex" class="indexSelect form-control">
+                <!--                    <option value="沪深300 -（000300）" disabled selected="selected"> 沪深300 -（000300）</option>-->
+                <option  v-for="bean,index in indexes" :value="bean.name+'-'+bean.code+'-'+index">  {{bean.name}} -（{{bean.code}}）</option>
+            </select>
+        </td>
+        <td width="25%"></td>
+        <td width="25%"></td>
+    </tr>
+
+    <tr> <!--第二行  均日选择-->
+        <td>
+            <span data-toggle="tooltip" data-placement="top" title="MA 即 moving average, 移动均线的意思。 比如MA20就表示20日均线，取最近20天的值的平均数">
+                MA(均线) :<span class="glyphicon glyphicon-question-sign   " > </span>
+            </span>
+        </td>
+        <td>
+            <select class="form-control" @change="changeParam" v-model="ma">
+                <option  value="5">5日</option>
+                <option  value="10">10日</option>
+                <option  value="20">20日</option>
+                <option  value="60">60日</option>
+            </select>
+        </td>
+    </tr>
+
+</table>

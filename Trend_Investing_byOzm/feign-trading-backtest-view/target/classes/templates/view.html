@@ -1,0 +1,661 @@
+<!DOCTYPE html> <!--日期控件:bootstrap-datepicker-->
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="include/header::html('量化：趋势投资-模拟回测')" ></head>
+<script>
+    //图表制作对象 基于chart.js
+    var chart4Profit = null;
+    var chart4AnnualIncome = null;
+    //加载vue
+    $(function () {
+
+        var vue4Data = {
+            indexes: [], //指数代码
+            currentIndex: "沪深300-000300-8", //双向绑定 默认指数名称代码
+            indexDatas:[], //指数数据
+            dates:[],//指数日期
+            closePoints:[], //日期对应的收盘价
+            z_name:'沪深300',//指数名称
+            code:'000300',//指数代码 名称与代码都是由currentIndex中分割出来的
+
+            flushDate: true,//判断是否要更新日期
+            indexStartDate: null,//指数的开始日期
+            indexEndDate: null,//指数的结束日期
+            startDate: null,//发送的服务端的指数开始日期
+            endDate: null,//发送的服务端的指数开始日期
+
+            profits:[], //收益对象用于创建趋势投资收益曲线,灭一个profit对象在图中代表一个点
+            profitValues:[],//收益数据集
+
+            records:[],
+
+            years:0, //年份
+            indexProfit:0,//指数收益
+            indexYearsProfit:0,//指数年化收益
+            trendProfit:0,//趋势投资收益
+            trendYearsProfit:0,//趋势投资年化收益
+
+
+            winCount:0,//盈利次数
+            lossCount:0,//亏损次数
+            avgWinRate:0,//平均盈利率 = 盈利率/盈利次数  盈利率 = 卖出收盘价-买入收盘价/买入收盘价
+            avgLossRate:0,//平均亏损率  = 亏损率/亏损次数 亏损率 = 卖出收盘价 - 买入收盘价/买入收盘价
+
+
+            //收益分布
+            annualProfits: [], //每年收益分布集合
+            annuals:[],//收益年份
+            indexIncomes:[],//指数收益
+            trendIncomes:[],//趋势收益
+
+            ma:5,//默认5均日
+            buyThreshold:1.01,//买入阈值
+            sellThreshold:0.95,//卖出阈值
+            serviceCharge:0.0,//手续费
+
+            //指数数据类型，用于下拉框选择时辨认是公共实例的数据还是用户上传的数据
+            dataType:'',
+
+
+        };
+        var vue = new Vue({
+            el:'#workingArea',
+            data:vue4Data,
+            mounted:function () { //vue加载完成后触发该方法
+                this.init();
+                //悬停信息提示
+                $("[data-toggle='tooltip']").tooltip();
+            },
+            methods:{
+                init:function () {
+                    //访问网关的 api-codes 获取"所有"指数代码,从网关上获取指数代码，
+                    //而不直接访问指数代码微服务，从网关上访问从而达到集群中的微服务动态平衡
+                    var prefix_zuul = "http://127.0.0.1:8031";
+                    var address_codes = "/api-codes/codes";
+                    var url = prefix_zuul + address_codes;
+                    axios.get(url).then(function (response) {
+                        //console.log(response);
+                        vue.indexes = response.data;
+                        //声明回调，当获取到数据后，并在页面上选择完数据后该方法被调用
+                        vue.$nextTick(function(){
+                            //获取对应指数代码的指数数据，因为在指数代码的html标签上有双向绑定的code
+                            //所以可以很轻易地获取到指数代码对应的指数数据
+                            vue.simulate();
+                        });
+                    })
+                },
+                simulate:function () {
+                    // console.log(vue.currentIndex);
+                    // console.log('hello');
+                    //从指数回测微服务中取出指数数据(回测微服务只包含指数数据index-data)
+                    //真实路径(集群中的其一服务端口)：http://127.0.0.1:8051/simulate/code
+                    //old_网关路径：http://127.0.0.1:8031/api-backtest/simulate/code
+                    //new_网关路径 http://127.0.0.1:8031/api-backtest/simulate/code/startDate/endDate
+                    var prefix_zuul = "http://127.0.0.1:8031";
+                    var address_backtest = "/api-backtest/simulate/"; //指数回测服务
+                    //从双向绑定的currentIndex中分割出 指数代码和指数代码对应名称
+                    vue.code  =  vue.currentIndex.split('-')[1]; //双向绑定选中的指数对应的code option~ :value
+                    vue.z_name = vue.currentIndex.split('-')[0];
+                    console.log(vue.currentIndex);
+                    if (vue.currentIndex.split('-')[2]<=10){
+                        vue.dataType = "public"; //代表是公共实例的数据
+                    }else{
+                        vue.dataType = "root";//代表是用户的数据
+                    }
+
+                    console.log(vue.dataType);
+
+                    // console.log('code='+vue.code);
+                    // console.log('name='+vue.z_name);
+                    //如果是使用日期控件重新设定开始日期时，重新请求对应日期的数据
+                    var url = prefix_zuul + address_backtest + vue.code+"/"+vue.ma+"/"+vue.buyThreshold+"/"+vue.sellThreshold+"/"+vue.serviceCharge+"/"+vue.startDate+"/"+vue.endDate+"/"+vue.dataType;
+                    console.log(url);
+                    //请求 如果日期不指定，则返回所有的数据
+                    axios.get(url).then(function (response) {
+                        if (response.data.Errmsg!=null){
+                            alert(response.data.Errmsg);
+                        }
+
+
+                        //为了保持每一次的数据都不同，必须在请求下一次指数数据前，先清空上一次数据
+                        vue.indexDatas = [];
+                        vue.dates = [];
+                        vue.closePoints = [];
+                        vue.profits = [];
+                        vue.profitValues =[];
+                        vue.records = [];
+                        //清除收益分布
+                        vue.annualProfits = [];
+                        vue.annuals = [];
+                        vue.indexIncomes = [];
+                        vue.trendIncomes = [];
+
+                        //返回指数数据
+                        //获取返回数据 response为一个map数组 Map<indexDataes,List<IndexData>>
+                        //其实这里获得的数据为key为indexDates value为多个以list为数组的IndexData
+                        vue.indexDatas = response.data.indexDatas;//List<IndexData>
+                        vue.dates = new Array();
+                        vue.closePoints = new Array();
+
+                        //返回指数日期
+                        //指数日期注入 Map<....Date,List<IndexData>>
+                        vue.indexStartDate = response.data.indexStartDate;
+                        vue.indexEndDate = response.data.indexEndDate;
+
+                        //用于画趋势投资曲线的收益数据
+                        //收益
+                        vue.profits = response.data.profits;
+
+
+                        //指数数据和趋势投资收益“点”数据注入   构图表
+                        for ( i in vue.indexDatas ){
+                            var indexData = vue.indexDatas[i];
+                            vue.dates.push(indexData.date);
+                            vue.closePoints.push(indexData.closePoint);
+                            //收益数据注入
+                            var profit = vue.profits[i];
+                            vue.profitValues.push(profit.value);
+                        }
+
+                        //交易明细
+                        vue.records = response.data.records;
+
+
+                        //收益一览，包括指数收益和指数年化收益 趋势投资收益和趋势投资年化收益
+                        vue.years = response.data.years;
+                        vue.indexProfit = response.data.indexProfit;
+                        vue.indexYearsProfit = response.data.indexYearsProfit;
+                        vue.trendProfit = response.data.trendProfit;
+                        vue.trendYearsProfit = response.data.trendYearsProfit;
+
+
+                        //交易统计
+                        vue.winCount = response.data.winCount;
+                        vue.lossCount = response.data.lossCount;
+                        vue.avgWinRate = response.data.avgWinRate;
+                        vue.avgLossRate = response.data.avgLossRate;
+
+
+                        //收益分布 返回的是每年收益对象数组
+                        vue.annualProfits = response.data.annualProfits;
+                        for (i in vue.annualProfits){
+                            vue.annuals.push(vue.annualProfits[i].year);
+                            vue.indexIncomes.push(vue.annualProfits[i].indexIncome*100);
+                            vue.trendIncomes.push(vue.annualProfits[i].trendIncome*100);
+                        }
+
+
+
+
+                        //更新图表，用到 chartjs 这个第三方工具
+
+                        //原指数趋势图表,纵坐标为收盘价，横坐标为日期
+                        chart4Profit.config.data.labels = vue.dates; //指数日期作为数据项 横坐标
+                        chart4Profit.config.data.datasets[0].label = vue.z_name+'-（'+vue.code +'）'; //指数代码作为数据名称
+                        chart4Profit.config.data.datasets[0].data = vue.closePoints;//收盘价作为主要数据 纵坐标
+                        //趋势投资收益图标，纵坐标为收益，横坐标为日期
+                        chart4Profit.config.data.datasets[1].data = vue.profitValues;
+                        //更新指数图表
+                        chart4Profit.update();
+
+
+                        //更新收益图表
+                        chart4AnnualIncome.config.data.labels = vue.annuals;
+                        chart4AnnualIncome.config.data.datasets[0].label = vue.currentIndex;
+                        chart4AnnualIncome.config.data.datasets[0].data = vue.indexIncomes;
+                        chart4AnnualIncome.config.data.datasets[1].data = vue.trendIncomes;
+                        chart4AnnualIncome.update();
+
+
+                        //表示如果flushDate 是true，就会刷新日期，默认是 true, 即一开始就会刷新日期
+                        if(vue.flushDate)
+                            vue.updateDate();
+                    });
+                },
+                //当指数选择下拉框双向绑定的值发生改变时，再次请求数据
+                //重新请求并同时刷新控件日期数据
+                changeParamWithFlushDate:function(){
+                    vue.flushDate = true;
+                    vue.startDate = null;
+                    vue.endDate = null;
+                    vue.simulate();
+                },
+
+                //用于日期控件日期范围范围不合法时执行
+                //不刷新日期控件,即在重新请求的情况下某个特点时间的数据
+                // 更改canvas。把canvas的画图日期设定为日期控件控制的范围内
+                changeParam:function(){
+                    vue.flushDate = false;
+                    vue.simulate();
+                },
+
+                //跳转到拟合页面
+                jump:function(){
+                    // @GetMapping("/result")
+                    window.location.href="http://127.0.0.1:8031/api-view/result";
+                },
+
+
+
+                //日期更新  日期控件使用bootstrap-datepicker
+                updateDate:function () {
+                    //注入传入到服务端的开始日期和结束日期
+                    vue.startDate = vue.indexStartDate;
+                    vue.endDate = vue.indexEndDate;
+
+                    // console.log('startDate=' + vue.startDate);
+                    // console.log('endDate=' + vue.endDate);
+                    //日期控件 bootstrap-datepicker
+                    //先取消日期控件#date4Start，否则后续新的日期范围如果超出了前面的日期范围，会出冲突
+                    $('#date4Start').datepicker("destroy");
+                    //日期控件dataPicker ----开始
+                    $('#date4Start').datepicker({
+                        //初始化日期空间，设置了格式，语言，是否自动关闭，日期范围
+                        "format": 'yyyy-mm-dd',
+                        "language": "zh-CN",
+                        autoclose: true,
+                        startDate: vue.indexStartDate,
+                        endDate: vue.indexEndDate,
+                    }).on("changeDate",function(e){//日期控件点击后响应e为日期对象
+                        var month = (e.date.getMonth()+1);
+                        if(month <10)
+                            month = '0'+month;
+                        var day = (e.date.getDate());
+                        if(day <10)
+                            day = '0'+day;
+                        //重新将日期进行赋值，用于canvas画图
+                        vue.startDate = e.date.getFullYear()+"-"+month+"-"+day;
+
+                        //当数据不合法时 不刷新数据
+                        if(!vue.checkDateRange()){
+                            $('#date4Start').datepicker('update', vue.indexStartDate);
+                            return;
+                        }
+
+                        vue.changeParam();
+                    });
+
+
+                    $('#date4End').datepicker({
+                        //初始化日期空间，设置了格式，语言，是否自动关闭，日期范围
+                        "format": 'yyyy-mm-dd',
+                        "language": "zh-CN",
+                        autoclose: true,
+                        startDate: vue.indexStartDate,
+                        endDate: vue.indexEndDate,
+                    }).on("changeDate", function (e) { //日期控件点击后响应e为日期对象
+                        var month = (e.date.getMonth() + 1);
+                        if (month < 10) //格式化月份01月
+                            month = '0' + month;
+                        var day = (e.date.getDate());
+                        if (day < 10) //格式化日期 01日
+                            day = '0' + day;
+                        //重新将日期进行赋值，用于canvas画图
+                        vue.endDate = e.date.getFullYear() + "-" + month + "-" + day;
+                        //校验日期是否合法，并且将字符串的日期数据转换为日期对象并校验是否在合法范围内
+                        //合法的范围内，即开始时间不能大于结束时间。要比较时间需要将字符串转换为日期对象
+                        if (!vue.checkDateRange()) {
+                            $('#date4End').datepicker('update', vue.indexEndDate);
+                            return;
+                        }
+                        vue.changeParam();
+                    });
+
+                    $('#date4Start').datepicker('update', vue.indexStartDate);
+                    $('#date4End').datepicker('update', vue.indexEndDate);
+                },
+
+                //校验日期是否在范围内
+                checkDateRange:function () {
+                    if(null==vue.startDate || null==vue.endDate)
+                        return true;
+
+                    //格式化开始日期，将例如2019-04-29转换为2019/04/29
+                    var strStartDate = vue.startDate.replace(/-/g, '/');
+                    var strEndDate = vue.endDate.replace(/-/g, '/');
+
+                    //将字符串转换为日期对象
+                    var startTime = new Date(strStartDate).getTime();
+                    var endTime = new Date(strEndDate).getTime();
+
+                    if (startTime>endTime){
+                        alert("开始日期不能大于日期！");
+                        return false;
+                    }
+                    return true;
+                },
+
+            }
+        });
+        //chart.js域
+        //创建chart.js对象
+        //1、获得制作区域的canvs的2d对象  https://www.chartjs.org/docs/latest/
+        //指数图表
+        var ctx4Profit = $(".canvas4Profit")[0].getContext('2d');
+        //2、基于 ctx Chart对象，创建Chart对象 并传递对应参数进去
+        chart4Profit = new Chart(ctx4Profit,{
+            type:"line", //线条类型
+            data:{ //要展示的数据
+                labels:'',//横坐标文字,即具体要展示的数据项
+                datasets:[
+                    //指数图表
+                    { //数据项对应的数据
+                    label: '', //这组数据的名称
+                    data: [],//具体数据
+                    borderColor: '#FF4040',//线条颜色
+                    backgroundColor: '#FF4040',
+                    borderWidth: 1.2,
+                    pointRadius: 0,
+                    fill: false,
+                    lineTension: 0,
+                    },
+                    //趋势投资收益图表
+                    {
+                        label: '趋势投资',
+                        data: [],
+                        borderColor: '#5D98C8',
+                        backgroundColor: '#5D98C8',
+                        borderWidth: 1.2,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    }
+                ]
+                },
+            options:{ //其他选项
+                title:{
+                    display:true,
+                    text: '指数趋势投资收益对比图'
+                },
+                responsive:true,// 表示有新数据的时候会重新画
+                responsiveAnimationDuration:3000,//重画延迟
+                tooltips: {//鼠标移动在图标上（数据点）显示的信息
+                    intersect: false, //鼠标不在图标上也会提示信息
+                    mode: 'index', //显示模式
+                    callbacks: {//表示提示信息的格式是： 标签名 ： 取两位小数的数值
+                        label: function(tooltipItem, myData) { //单个项的提示文本
+                            var label = myData.datasets[tooltipItem.datasetIndex].label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            label += parseFloat(tooltipItem.value).toFixed(2);
+                            return label;
+                        }
+                    }
+                },
+                scales: {
+                    yAxes: [{
+                        ticks: {
+                            beginAtZero: false,
+                        }
+                    }]
+                },
+            }
+
+        });
+
+        //收益分布图表
+        var ctx4AnnualIncome = $(".canvas4AnnualIncome")[0].getContext('2d');
+        chart4AnnualIncome = new Chart(ctx4AnnualIncome, {
+            type: 'bar',
+            data: {
+                labels: '',//横坐标
+                datasets: [
+                    {
+                        label: '',
+                        data: [],
+                        borderColor: '#FF4040',
+                        backgroundColor: '#FF4040',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    },
+                    {
+                        label: '趋势投资',
+                        data: [],
+                        borderColor: '#5D98C8',
+                        backgroundColor: '#5D98C8',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    }
+                ]
+            },
+            options: {
+                title: {
+                    display: true,
+                    text: '指数/趋势收益分布对比图'
+                },
+                responsive: true,
+                responsiveAnimationDuration:3000,
+                scales: {
+                    yAxes: [{
+                        ticks: {
+                            beginAtZero: true,
+                        }
+                    }]
+                },
+                tooltips: {
+                    intersect: false,
+                    mode: 'index',
+
+                    callbacks: {
+                        label: function(tooltipItem, myData) {
+                            var label = myData.datasets[tooltipItem.datasetIndex].label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            label += parseFloat(tooltipItem.value).toFixed(2);
+                            label += "%";
+                            return label;
+                        }
+                    }
+                }
+            }
+        });
+    });
+</script>
+<style>
+    table.inputTable{
+        width:100%;
+    }
+    table.inputTable td{
+        padding:20px 20px;
+    }
+
+    table{
+        margin:20px;
+    }
+
+    #workingArea{
+        margin-left: 16% !important;
+    }
+
+    body {
+        font-size: 1.4rem !important;
+    }
+
+    a {
+        font-size: 1.4rem !important;
+    }
+
+    #mainNav{
+        position: sticky !important;
+    }
+    .navbar-brand {
+        padding-top: 1.3rem !important;
+        padding-bottom: .75rem;
+        font-size: 1.7rem !important;
+        background-color: rgba(0, 0, 0, .25);
+        box-shadow: inset -1px 0 0 rgba(0, 0, 0, .25);
+    }
+
+    .navbar .form-control {
+        padding: .75rem 1rem;
+        border-width: 0;
+        border-radius: 0;
+    }
+
+    .form-control-dark {
+        color: #fff;
+        background-color: rgba(255, 255, 255, .1);
+        border-color: rgba(255, 255, 255, .1);
+    }
+
+    .form-control-dark:focus {
+        border-color: transparent;
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, .25);
+    }
+
+    .feather {
+        width: 16px;
+        height: 16px;
+        vertical-align: text-bottom;
+    }
+
+    /*
+     * Sidebar
+     */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 100; /* Behind the navbar */
+        padding: 0;
+        box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+    }
+
+    .sidebar-sticky {
+        position: -webkit-sticky;
+        position: sticky;
+        top: 48px; /* Height of navbar */
+        height: calc(100vh - 48px);
+        padding-top: .5rem;
+        overflow-x: hidden;
+        overflow-y: auto; /* Scrollable contents if viewport is shorter than content. */
+    }
+
+    .sidebar .nav-link {
+        font-weight: 500;
+        color: #333;
+    }
+
+    .sidebar .nav-link .feather {
+        margin-right: 4px;
+        color: #999;
+    }
+
+    .sidebar .nav-link.active {
+        color: #007bff;
+    }
+
+    .sidebar .nav-link:hover .feather,
+    .sidebar .nav-link.active .feather {
+        color: inherit;
+    }
+
+    .sidebar-heading {
+        font-size: .75rem;
+        text-transform: uppercase;
+    }
+
+    /*
+     * Navbar
+     */
+
+    .navbar-brand {
+        padding-top: .75rem;
+        padding-bottom: .75rem;
+        font-size: 1rem;
+        background-color: rgba(0, 0, 0, .25);
+        box-shadow: inset -1px 0 0 rgba(0, 0, 0, .25);
+    }
+
+    .navbar .form-control {
+        padding: .75rem 1rem;
+        border-width: 0;
+        border-radius: 0;
+    }
+
+    .form-control-dark {
+        color: #fff;
+        background-color: rgba(255, 255, 255, .1);
+        border-color: rgba(255, 255, 255, .1);
+    }
+
+    .form-control-dark:focus {
+        border-color: transparent;
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, .25);
+    }
+
+    /*
+     * Utilities
+     */
+
+    .border-top { border-top: 1px solid #e5e5e5; }
+    .border-bottom { border-bottom: 1px solid #e5e5e5; }
+
+
+
+</style>
+
+<body>
+<nav th:replace="Module/bar :: topBar"></nav>
+<div class="container-fluid">
+    <div class="row">
+        <nav th:replace="Module/bar::sidebar(activeUri='view.html')"></nav>
+    </div>
+
+    <main role="main" class="col-md-8 ml-sm-auto col-lg-10 pt-3 px-4" id="workingArea">
+        <div>
+            <span class="label label-info">回测参数</span>
+            <!--指数代码区域-->
+            <table th:replace="Module/inputTable::html"></table>
+
+            <span class="label label-info">大数据分析-拟合</span>
+            <br>
+            <button type="button" class="btn btn-link" @click="jump">交易统计-拟合</button>
+            <br>
+            <br>
+
+            <!--指数代码对应数据收益区域-->
+            <div class="label label-warning">收益对比图</div>
+
+            <!--展示区域-->
+            <div  class="div4chart" style="margin:0px auto; width:80%">
+                <canvas class='canvas4Profit'></canvas>
+            </div>
+
+            <!--收益一览区域-->
+            <div class="label label-warning">收益一览</div>
+            <table th:replace="Module/profit::html"></table>
+            <!--交易统计区域-->
+            <div class="label label-warning">交易统计</div>
+            <table th:replace="Module/tradeCalcu::html"></table>
+
+            <!--收益对比分布图-->
+            <div class="label label-warning">收益分布对比图</div>
+            <div  class="div4chart" style="margin:0px auto; width:80%">
+                <canvas class='canvas4AnnualIncome'></canvas>
+            </div>
+
+            <!--收益对比分布表-->
+            <div class="label label-warning">收益分布对比表</div>
+            <table th:replace="Module/incomeCompare::html"></table>
+
+            <!--交易明细区域-->
+            <div class="label label-warning">交易明细</div>
+            <table th:replace="Module/tradeRecord::html"></table>
+        </div>
+    </main>
+
+</div>
+
+
+<div th:replace="include/footer::html" ></div>
+
+
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+		<meta name="description" content="">
+		<meta name="author" content="">
+		<title>量化投资系统：登录</title>
+		<!-- Bootstrap core CSS -->
+		<link href=""  th:href="@{css/bootstrap/3.3.6/bootstrap.css}" rel="stylesheet">
+		<!-- Custom styles for this template -->
+		<link href="css/signin/signin.css" th:href="@{css/signin/signin.css}" rel="stylesheet">
+	</head>
+
+	<body class="text-center">
+		<form class="form-signin" th:action="@{/api-view/login}" method="post">
+			<img class="mb-4" th:src="@{img/icon2.png}" src="img/bootstrap-solid.svg" alt="" width="250" height="200">
+			<h1 class="h3 mb-3 font-weight-normal">登录到量化投资系统中</h1>
+			<!--使用thymeleaf模板引擎的工具类去判断msg信息是否存在 th:if的优先级要比th:text的高-->
+			<p  th:if="${not #strings.isEmpty(msg)}" th:text="${msg}" style="color: red"></p>
+			<label class="sr-only">Username</label>
+			<input type="text" name="username" class="form-control" placeholder="账号" required="" autofocus="">
+			<label class="sr-only">Password</label>
+			<input type="password" name="password" class="form-control" placeholder="密码" required="">
+			<div class="checkbox mb-3">
+				<label>
+          <input type="checkbox" value="remember-me"> 记住密码
+        </label>
+			</div>
+			<button class="btn btn-lg btn-primary btn-block" type="submit">登录</button>
+			<button class="btn btn-lg btn-primary btn-block" type="submit">注册</button>
+			<p class="mt-5 mb-3 text-muted">© 2020-2021</p>
+			<a class="btn btn-sm">中文</a>
+			<a class="btn btn-sm">English</a>
+		</form>
+
+	</body>
+
+</html>

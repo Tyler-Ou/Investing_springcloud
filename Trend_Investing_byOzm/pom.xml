@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.ozm.trend</groupId>
+  <artifactId>TrendInvesting_ParentProject</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <modules>
+    <!--eureka为服务注册中心，用于管理分布式的微服务-->
+    <module>eureka-server</module>
+    <module>third-part-index-data-project</module>
+      <module>index-gather-store-service</module>
+      <module>index-codes-service</module>
+      <module>index-data-service</module>
+      <module>index-zuul-service</module>
+      <module>trend-trading-backtest-service</module>
+    <module>trend-trading-backtest-service</module>
+    <module>sad</module>
+    <module>trend-trading-backtest-service</module>
+    <module>feign-trading-backtest-server</module>
+      <module>feign-trading-backtest-view</module>
+  </modules>
+  <!--默认是 jar, 修改为pom。 这样才可以作为父项目存在-->
+  <packaging>pom</packaging>
+  <name>trendParentProject</name>
+  <!-- FIXME change it to the project's website -->
+  <url>http://www.example.com</url>
+
+<!--在父场景启动器中导入SpringBoot-->
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>2.0.3.RELEASE</version>
+    <relativePath/>
+  </parent>
+
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.source>1.7</maven.compiler.source>
+    <maven.compiler.target>1.7</maven.compiler.target>
+    <!--指定SpringCloud版本-->
+    <spring-cloud.version>Finchley.RELEASE</spring-cloud.version>
+  </properties>
+
+  <dependencies>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.11</version>
+      <scope>test</scope>
+    </dependency>
+    <!--小型java类库-->
+    <dependency>
+      <groupId>cn.hutool</groupId>
+      <artifactId>hutool-all</artifactId>
+      <version>4.3.1</version>
+    </dependency>
+  </dependencies>
+
+<!--springCloud版本依赖声明-->
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-dependencies</artifactId>
+        <version>${spring-cloud.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+
+
+
+</project>

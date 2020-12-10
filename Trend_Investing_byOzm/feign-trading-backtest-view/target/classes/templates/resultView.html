@@ -1,0 +1,1525 @@
+<!DOCTYPE html> <!--日期控件:bootstrap-datepicker-->
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="include/header::html('量化：拟合投资-交易统计模拟回测')" ></head>
+<!--通过拟合分析结果 寻找最好收益-->
+<script>
+    //图表制作对象 基于chart.js
+    var chart4View_One = null; //拟合胜率曲线图
+    var chart4View_Two = null;//拟合胜率柱形图
+    var chart4View_Three = null;//拟合平均盈利比曲线图
+    var chart4View_Four = null;//拟合平均盈利比柱形图
+
+    var chart4View_Five = null;//拟合胜率分析结果 气泡对照图
+    var chart4View_Six = null;//拟合胜率分析结果 气泡拟合结果图
+
+    var chart4View_Seven = null;//拟合平均盈利分析结果 气泡对照图
+    var chart4View_Eight = null;//拟合平均盈利分析结果 气泡拟合结果图
+
+
+    $(function () {
+
+        var vue4Data={
+            indexes:[],//指数代码
+            name:'沪深300',//指数名称
+            code:'000300',//指数
+            currentIndex:'沪深300-000300-8',//默认值
+            ma:5,//默认值
+            result:[],
+            //用于构建交易明细表
+            t_data: {
+                winCount: 0,//盈利次数
+                lossCount: 0,//亏损次数
+                avgWinRate: 0,//平均盈利率 = 盈利率/盈利次数  盈利率 = 卖出收盘价-买入收盘价/买入收盘价
+                avgLossRate: 0,//平均亏损率  = 亏损率/亏损次数 亏损率 = 卖出收盘价 - 买入收盘价/买入收盘价
+                //标准量
+                analyse_buyRate:0,
+                analyse_sellRate:0,
+                ma:0,
+            },
+            //分析报告
+            AnalyseReport:{
+                ma:0,//均线
+                indexes:{
+                    code:'',
+                    name:''
+                },
+                winReport:[{}],//胜率拟合报告
+                avgProfitReport:[{}],//平均盈利拟合报告
+            },
+            //胜率拟合分析结果集合
+            winAnalyseRateArr1:{
+                analyse_buyRate:0,
+                analyse_sellRate:0,
+                winRate:0
+            },
+            winAnalyseRateArr2:{
+                analyse_buyRate:0,
+                analyse_sellRate:0,
+                winRate:0
+            },
+            winAnalyseRateArr3:{
+                analyse_buyRate:0,
+                analyse_sellRate:0,
+                winRate:0
+            },
+            winAnalyseRateArr4:{
+                analyse_buyRate:0,
+                analyse_sellRate:0,
+                winRate:0
+            },
+            winAnalyseRateArr5:{
+                analyse_buyRate:0,
+                analyse_sellRate:0,
+                winRate:0
+            },
+            //平均盈利拟合分析结果集合
+            avgProfitAnalyseArr1:{
+                analyse_buyRate:0,
+                analyse_sellRate:0,
+                winRate:0
+            },
+            avgProfitAnalyseArr2:{
+                analyse_buyRate:0,
+                analyse_sellRate:0,
+                winRate:0
+            },
+            avgProfitAnalyseArr3:{
+                analyse_buyRate:0,
+                analyse_sellRate:0,
+                winRate:0
+            },
+            avgProfitAnalyseArr4:{
+                analyse_buyRate:0,
+                analyse_sellRate:0,
+                winRate:0
+            },
+            avgProfitAnalyseArr5:{
+                analyse_buyRate:0,
+                analyse_sellRate:0,
+                winRate:0
+            },
+
+            //指数数据类型，用于下拉框选择时辨认是公共实例的数据还是用户上传的数据
+            dataType:'',
+
+
+        }
+        var vue = new Vue({
+            el:'#workingArea',
+            data:vue4Data,
+            mounted:function () { //加载完成后初始化基础数据
+                //请求基础代码数据
+                this.init();
+                //悬停信息提示
+                $("[data-toggle='tooltip']").tooltip();
+            },
+            methods:{
+                init:function(){
+                    var that = this;
+                    var prefix_zuul = "http://127.0.0.1:8031";
+                    var address_codes = "/api-codes/codes";
+                    var url = prefix_zuul + address_codes;
+                    axios.get(url).then(function (response) {
+                        vue.indexes = response.data;
+                            //声明回调，当获取到数据后，并在页面上选择完数据后该方法被调用
+                            vue.$nextTick(function(){
+                                vue.simulate();
+                            });
+                    })
+                },
+
+                simulate:function () {
+                    //通过网关访问
+                    //@GetMapping("/result/{code}")
+                    var that = this;
+                    that.code  =  that.currentIndex.split('-')[1]; //双向绑定选中的指数对应的code option~ :value
+                    that.name = that.currentIndex.split('-')[0];
+                    console.log(vue.currentIndex);
+                    if (vue.currentIndex.split('-')[2]<=10){
+                        vue.dataType = "public"; //代表是公共实例的数据
+                    }else{
+                        vue.dataType = "root";//代表是用户的数据
+                    }
+
+                    var prefix_zuul = "http://127.0.0.1:8031";
+                    var address_codes = "/api-backtest/";
+                    var url = prefix_zuul + address_codes +"tradeResult/"+that.code+"/"+that.ma+"/"+vue.dataType;
+                    axios.get(url).then(function (response) {
+                        var value4Format =0;
+
+                        //清空上一次数据
+                        vue.result=[];
+                        vue.t_data = {};//map相同字段无法重装
+                        vue.AnalyseReport.ma = 0;
+                        vue.AnalyseReport.indexes.code = 0;
+                        vue.AnalyseReport.indexes.name = '';
+                        vue.AnalyseReport.indexes.winReport = [];
+                        vue.AnalyseReport.indexes.avgProfitReport = [];
+                        //因为此处的数据逻辑是Push进去的，所以要手动清空上一次的数据
+                        //胜率拟合线性图
+                        chart4View_One.config.data.datasets[0].data = [];
+                        chart4View_One.config.data.datasets[1].data = [];
+                        chart4View_One.config.data.datasets[2].data = [];
+                        chart4View_One.config.data.datasets[3].data = [];
+                        chart4View_One.config.data.datasets[4].data = [];
+
+                        //胜率拟合柱形图
+                        chart4View_Two.config.data.datasets[0].data = [];
+                        chart4View_Two.config.data.datasets[1].data = [];
+                        chart4View_Two.config.data.datasets[2].data = [];
+                        chart4View_Two.config.data.datasets[3].data = [];
+                        chart4View_Two.config.data.datasets[4].data = [];
+
+                        //平均盈利拟合线形图
+                        chart4View_Three.config.data.datasets[0].data = [];
+                        chart4View_Three.config.data.datasets[1].data = [];
+                        chart4View_Three.config.data.datasets[2].data = [];
+                        chart4View_Three.config.data.datasets[3].data = [];
+                        chart4View_Three.config.data.datasets[4].data = [];
+
+                        //平均盈利拟合柱形图
+                        chart4View_Four.config.data.datasets[0].data = [];
+                        chart4View_Four.config.data.datasets[1].data = [];
+                        chart4View_Four.config.data.datasets[2].data = [];
+                        chart4View_Four.config.data.datasets[3].data = [];
+                        chart4View_Four.config.data.datasets[4].data = [];
+
+                        //胜率拟合结果 气泡图
+                        chart4View_Five.config.data.datasets[0].data[0] = [];
+                        chart4View_Five.config.data.datasets[1].data[0] = [];
+                        chart4View_Five.config.data.datasets[2].data[0] = [];
+                        chart4View_Five.config.data.datasets[3].data[0] = [];
+                        chart4View_Five.config.data.datasets[4].data[0] = [];
+
+                        //胜率拟合对照组 气泡图
+                        chart4View_Six.config.data.datasets[0].data = [];
+                        chart4View_Six.config.data.datasets[1].data = [];
+                        chart4View_Six.config.data.datasets[2].data = [];
+                        chart4View_Six.config.data.datasets[3].data = [];
+                        chart4View_Six.config.data.datasets[4].data = [];
+
+                        //平均盈利拟合对照组 气泡图
+                        chart4View_Seven.config.data.datasets[0].data = [];
+                        chart4View_Seven.config.data.datasets[1].data = [];
+                        chart4View_Seven.config.data.datasets[2].data = [];
+                        chart4View_Seven.config.data.datasets[3].data = [];
+                        chart4View_Seven.config.data.datasets[4].data = [];
+
+                        //平均盈利率拟合结果 气泡图
+                        chart4View_Eight.config.data.datasets[0].data[0] = [];
+                        chart4View_Eight.config.data.datasets[1].data[0] = [];
+                        chart4View_Eight.config.data.datasets[2].data[0] = [];
+                        chart4View_Eight.config.data.datasets[3].data[0] = [];
+                        chart4View_Eight.config.data.datasets[4].data[0] = [];
+
+
+
+                        //获得交易统计
+                        //console.log(response.data);
+
+                        //更新对应图表和封装交易统计数据
+                        //1、横坐标
+                        chart4View_One.config.data.labels = [0.95,0.96,0.97,0.98,0.99];
+                        chart4View_Two.config.data.labels = [0.95,0.96,0.97,0.98,0.99];
+                        chart4View_Three.config.data.labels = [0.95,0.96,0.97,0.98,0.99];
+                        chart4View_Four.config.data.labels = [0.95,0.96,0.97,0.98,0.99];
+
+
+                        var maxWinRate1 = 0; //初始最大胜率 1
+                        var maxWinRate2 = 0; //初始最大胜率 2
+                        var maxWinRate3 = 0; //初始最大胜率 3
+                        var maxWinRate4 = 0; //初始最大胜率 4
+                        var maxWinRate5 = 0; //初始最大胜率 5
+
+                        var maxAvgProfitRate1 = 0;//默认最大平均盈利率 1
+                        var maxAvgProfitRate2 = 0;//默认最大平均盈利率 2
+                        var maxAvgProfitRate3 = 0;//默认最大平均盈利率 3
+                        var maxAvgProfitRate4 = 0;//默认最大平均盈利率 4
+                        var maxAvgProfitRate5 = 0;//默认最大平均盈利率 5
+
+                        for(i in response.data){
+                            //拟合 数据分批处理
+                            //胜率
+                            var value4Format = (response.data[i].winCount/(response.data[i].winCount+response.data[i].lossCount))*100;
+                            //平均盈利率
+                            var avgValue4Format = response.data[i].avgWinRate *100;
+                            var analyse_buyRate = response.data[i].analyse_buyRate;
+                            var analyse_sellRate = response.data[i].analyse_sellRate;
+                            if (analyse_buyRate==1.01){
+                                //购买阀值1.01 与 售出阀值0.90-0.95拟合
+                                //2、图表对应数据组名称
+                                chart4View_One.config.data.datasets[0].label = "购买阈值:1.01";
+                                chart4View_One.config.data.datasets[0].data.push(vue.formatNumberFilter(value4Format,2));
+
+                                chart4View_Two.config.data.datasets[0].label = "购买阈值:1.01";
+                                chart4View_Two.config.data.datasets[0].data.push(vue.formatNumberFilter(value4Format,2));
+
+                                chart4View_Three.config.data.datasets[0].label = "购买阈值:1.01";
+                                chart4View_Three.config.data.datasets[0].data.push(vue.formatNumberFilter(avgValue4Format,2));
+
+                                chart4View_Four.config.data.datasets[0].label = "购买阈值:1.01";
+                                chart4View_Four.config.data.datasets[0].data.push(vue.formatNumberFilter(avgValue4Format,2));
+
+
+                                //3、分析算法，传入数据比较最优解，筛选最佳标准量组合
+                                //3、1存储结果到分析算法到气泡图对照图上
+                                var nowBuyRate = analyse_buyRate;
+                                var nowSellRate = analyse_sellRate
+                                //x为购买阈值，y为胜率，r为出售阈值
+                                var cmpData = {"x":nowSellRate,"y":vue.formatNumberFilter(value4Format,2),"r":nowBuyRate*10};
+                                chart4View_Six.config.data.datasets[0].data.push(cmpData);
+                                chart4View_Six.config.data.datasets[0].label = "1.01离散点：出售阈值,胜率%,购买阈值*10%";
+
+
+                                //x为出售阀值，Y为平均盈利率，r为购买阈值
+                                var cmpDate2 = {"x":nowSellRate,"y":vue.formatNumberFilter(avgValue4Format,2),"r":nowBuyRate*10};
+
+                                chart4View_Seven.config.data.datasets[0].data.push(cmpDate2);
+                                chart4View_Seven.config.data.datasets[0].label = "1.01离散点：出售阈值,平均盈利率%,购买阈值*10%";
+
+                                //3.2、胜率分析算法和平均盈利率分析算法
+                                maxWinRate1 = vue.winRateAnalyse(maxWinRate1,vue.formatNumberFilter(value4Format,2),nowBuyRate,nowSellRate);
+                                maxAvgProfitRate1 = vue.avgWinRateAnalyse(maxAvgProfitRate1,vue.formatNumberFilter(avgValue4Format,2),nowBuyRate,nowSellRate);
+
+                            }else if (analyse_buyRate==1.02){
+                                chart4View_One.config.data.datasets[1].label = "购买阈值:1.02";
+                                chart4View_One.config.data.datasets[1].data.push(vue.formatNumberFilter(value4Format,2));
+
+                                chart4View_Two.config.data.datasets[1].label = "购买阈值:1.02";
+                                chart4View_Two.config.data.datasets[1].data.push(vue.formatNumberFilter(value4Format,2));
+
+
+                                chart4View_Three.config.data.datasets[1].label = "购买阈值:1.02";
+                                chart4View_Three.config.data.datasets[1].data.push(vue.formatNumberFilter(avgValue4Format,2));
+
+                                chart4View_Four.config.data.datasets[1].label = "购买阈值:1.02";
+                                chart4View_Four.config.data.datasets[1].data.push(vue.formatNumberFilter(avgValue4Format,2));
+
+                                //3、分析算法，传入数据比较最优解，筛选最佳标准量组合
+                                //3、1存储结果到分析算法到气泡图对照图上
+                                var nowBuyRate = analyse_buyRate;
+                                var nowSellRate = analyse_sellRate
+                                //x为购买阈值，y为胜率，r为出售阈值
+                                var cmpData = {"x":nowSellRate,"y":vue.formatNumberFilter(value4Format,2),"r":nowBuyRate*10};
+                                chart4View_Six.config.data.datasets[1].data.push(cmpData);
+                                chart4View_Six.config.data.datasets[1].label = "1.02离散点：出售阈值,胜率%,购买阈值*10%";
+
+
+
+                                //x为出售阀值，Y为平均盈利率，r为购买阈值
+                                var cmpDate2 = {"x":nowSellRate,"y":vue.formatNumberFilter(avgValue4Format,2),"r":nowBuyRate*10};
+                                chart4View_Seven.config.data.datasets[1].data.push(cmpDate2);
+                                chart4View_Seven.config.data.datasets[1].label = "1.02离散点：出售阈值,平均盈利率%,购买阈值*10%";
+
+                                //3.2、胜率分析算法和平均盈利率分析算法
+                                maxWinRate2 = vue.winRateAnalyse(maxWinRate2,vue.formatNumberFilter(value4Format,2),nowBuyRate,nowSellRate);
+                                maxAvgProfitRate2 = vue.avgWinRateAnalyse(maxAvgProfitRate2,vue.formatNumberFilter(avgValue4Format,2),nowBuyRate,nowSellRate);
+                            }else if (analyse_buyRate==1.03){
+                                chart4View_One.config.data.datasets[2].label = "购买阈值:1.03";
+                                chart4View_One.config.data.datasets[2].data.push(vue.formatNumberFilter(value4Format,2));
+
+                                chart4View_Two.config.data.datasets[2].label = "购买阈值:1.03";
+                                chart4View_Two.config.data.datasets[2].data.push(vue.formatNumberFilter(value4Format,2));
+
+                                chart4View_Three.config.data.datasets[2].label = "购买阈值:1.03";
+                                chart4View_Three.config.data.datasets[2].data.push(vue.formatNumberFilter(avgValue4Format,2));
+
+                                chart4View_Four.config.data.datasets[2].label = "购买阈值:1.03";
+                                chart4View_Four.config.data.datasets[2].data.push(vue.formatNumberFilter(avgValue4Format,2));
+
+                                //3、分析算法，传入数据比较最优解，筛选最佳标准量组合
+                                //3、1存储结果到分析算法到气泡图对照图上
+                                var nowBuyRate = analyse_buyRate;
+                                var nowSellRate = analyse_sellRate
+
+                                //x为出售阈值，y为胜率，r为购买阈值
+                                var cmpData = {"x":nowSellRate,"y":vue.formatNumberFilter(value4Format,2),"r":nowBuyRate*10};
+                                chart4View_Six.config.data.datasets[2].data.push(cmpData);
+                                chart4View_Six.config.data.datasets[2].label = "1.03离散点：出售阈值,胜率%,购买阈值*10%";
+
+
+                                //x为出售阀值，Y为平均盈利率，r为购买阈值
+                                var cmpDate2 = {"x":nowSellRate,"y":vue.formatNumberFilter(avgValue4Format,2),"r":nowBuyRate*10};
+                                chart4View_Seven.config.data.datasets[2].data.push(cmpDate2);
+                                chart4View_Seven.config.data.datasets[2].label = "1.03离散点：出售阈值,平均盈利率%,购买阈值*10%";
+
+                                //3.2、胜率分析算法和平均盈利率分析算法
+                                maxWinRate3 = vue.winRateAnalyse(maxWinRate3,vue.formatNumberFilter(value4Format,2),nowBuyRate,nowSellRate);
+                                maxAvgProfitRate3 = vue.avgWinRateAnalyse(maxAvgProfitRate3,vue.formatNumberFilter(avgValue4Format,2),nowBuyRate,nowSellRate);
+                            }else if (analyse_buyRate==1.04){
+                                chart4View_One.config.data.datasets[3].label = "购买阈值:1.04";
+                                chart4View_One.config.data.datasets[3].data.push(vue.formatNumberFilter(value4Format,2));
+
+                                chart4View_Two.config.data.datasets[3].label = "购买阈值:1.04";
+                                chart4View_Two.config.data.datasets[3].data.push(vue.formatNumberFilter(value4Format,2));
+
+
+                                chart4View_Three.config.data.datasets[3].label = "购买阈值:1.04";
+                                chart4View_Three.config.data.datasets[3].data.push(vue.formatNumberFilter(avgValue4Format,2));
+
+                                chart4View_Four.config.data.datasets[3].label = "购买阈值:1.04";
+                                chart4View_Four.config.data.datasets[3].data.push(vue.formatNumberFilter(avgValue4Format,2));
+
+                                //3、分析算法，传入数据比较最优解，筛选最佳标准量组合
+                                //3、1存储结果到分析算法到气泡图对照图上
+                                var nowBuyRate = analyse_buyRate;
+                                var nowSellRate = analyse_sellRate
+                                //x为购买阈值，y为胜率，r为出售阈值
+                                var cmpData = {"x":nowSellRate,"y":vue.formatNumberFilter(value4Format,2),"r":nowBuyRate*10};
+                                chart4View_Six.config.data.datasets[3].data.push(cmpData);
+                                chart4View_Six.config.data.datasets[3].label = "1.04离散点：出售阈值,胜率%,购买阈值*10%";
+
+                                //x为出售阀值，Y为平均盈利率，r为购买阈值
+                                var cmpDate2 = {"x":nowSellRate,"y":vue.formatNumberFilter(avgValue4Format,2),"r":nowBuyRate*10};
+                                chart4View_Seven.config.data.datasets[3].data.push(cmpDate2);
+                                chart4View_Seven.config.data.datasets[3].label = "1.04离散点：出售阈值,平均盈利率%,购买阈值*10%";
+
+                                //3.2、胜率分析算法和平均盈利率分析算法
+                                maxWinRate4 = vue.winRateAnalyse(maxWinRate4,vue.formatNumberFilter(value4Format,2),nowBuyRate,nowSellRate);
+                                maxAvgProfitRate4 = vue.avgWinRateAnalyse(maxAvgProfitRate4,vue.formatNumberFilter(avgValue4Format,2),nowBuyRate,nowSellRate);
+
+                            }else if (analyse_buyRate==1.05){
+                                chart4View_One.config.data.datasets[4].label = "购买阈值:1.05";
+                                chart4View_One.config.data.datasets[4].data.push(vue.formatNumberFilter(value4Format,2));
+
+                                chart4View_Two.config.data.datasets[4].label = "购买阈值:1.05";
+                                chart4View_Two.config.data.datasets[4].data.push(vue.formatNumberFilter(value4Format,2));
+
+                                chart4View_Three.config.data.datasets[4].label = "购买阈值:1.05";
+                                chart4View_Three.config.data.datasets[4].data.push(vue.formatNumberFilter(avgValue4Format,2));
+
+                                chart4View_Four.config.data.datasets[4].label = "购买阈值:1.05";
+                                chart4View_Four.config.data.datasets[4].data.push(vue.formatNumberFilter(avgValue4Format,2));
+
+
+
+                                //3、分析算法，传入数据比较最优解，筛选最佳标准量组合
+                                //3、1存储结果到分析算法到气泡图对照图上
+                                var nowBuyRate = analyse_buyRate;
+                                var nowSellRate = analyse_sellRate
+                                //x为购买阈值，y为胜率，r为出售阈值
+                                var cmpData = {"x":nowSellRate,"y":vue.formatNumberFilter(value4Format,2),"r":nowBuyRate*10};
+                                chart4View_Six.config.data.datasets[4].data.push(cmpData);
+                                chart4View_Six.config.data.datasets[4].label = "1.05离散点：出售阈值,胜率%,购买阈值*10%";
+
+                                //x为出售阀值，Y为平均盈利率，r为购买阈值
+                                var cmpDate2 = {"x":nowSellRate,"y":vue.formatNumberFilter(avgValue4Format,2),"r":nowBuyRate*10};
+                                chart4View_Seven.config.data.datasets[4].data.push(cmpDate2);
+                                chart4View_Seven.config.data.datasets[4].label = "1.05离散点：出售阈值,平均盈利率%,购买阈值*10%";
+
+
+                                //3.2、胜率分析算法和平均盈利率分析算法
+                                maxWinRate5 = vue.winRateAnalyse(maxWinRate5,vue.formatNumberFilter(value4Format,2),nowBuyRate,nowSellRate);
+                                maxAvgProfitRate5 = vue.avgWinRateAnalyse(maxAvgProfitRate5,vue.formatNumberFilter(avgValue4Format,2),nowBuyRate,nowSellRate);
+                            }
+
+
+
+                            //将交易统计封装
+                            vue.t_data.winCount = response.data[i].winCount;
+                            vue.t_data.lossCount = response.data[i].lossCount;
+                            vue.t_data.avgWinRate = response.data[i].avgWinRate;
+                            vue.t_data.avgLossRate = response.data[i].avgLossRate;
+                            //vue.t_data.analyse_buyRate = response.data[i].analyse_buyRate;
+                            vue.t_data.analyse_buyRate = analyse_buyRate;
+                            //vue.t_data.analyse_sellRate = response.data[i].analyse_sellRate;
+                            vue.t_data.analyse_sellRate =analyse_sellRate;
+                            vue.t_data.ma = vue.ma;
+                            vue.result.push(vue.t_data);
+                            vue.t_data = {};//map相同字段无法重装
+                        }
+
+
+
+                        //更新图表
+                        chart4View_One.update();
+                        chart4View_Two.update();
+                        chart4View_Three.update();
+                        chart4View_Four.update();
+
+                        //封装分析数据并更新对应气泡拟合完成图表
+                        //胜率
+                        chart4View_Five.config.data.datasets[0].data[0].x = vue.winAnalyseRateArr1.analyse_sellRate;
+                        chart4View_Five.config.data.datasets[1].data[0].x = vue.winAnalyseRateArr2.analyse_sellRate;
+                        chart4View_Five.config.data.datasets[2].data[0].x = vue.winAnalyseRateArr3.analyse_sellRate;
+                        chart4View_Five.config.data.datasets[3].data[0].x = vue.winAnalyseRateArr4.analyse_sellRate;
+                        chart4View_Five.config.data.datasets[4].data[0].x = vue.winAnalyseRateArr5.analyse_sellRate;
+
+                        chart4View_Five.config.data.datasets[0].data[0].y = vue.winAnalyseRateArr1.winRate;
+                        chart4View_Five.config.data.datasets[1].data[0].y = vue.winAnalyseRateArr2.winRate;
+                        chart4View_Five.config.data.datasets[2].data[0].y = vue.winAnalyseRateArr3.winRate;
+                        chart4View_Five.config.data.datasets[3].data[0].y = vue.winAnalyseRateArr4.winRate;
+                        chart4View_Five.config.data.datasets[4].data[0].y = vue.winAnalyseRateArr5.winRate;
+
+                        chart4View_Five.config.data.datasets[0].data[0].r = vue.winAnalyseRateArr1.analyse_buyRate*10;
+                        chart4View_Five.config.data.datasets[1].data[0].r = vue.winAnalyseRateArr2.analyse_buyRate*10;
+                        chart4View_Five.config.data.datasets[2].data[0].r = vue.winAnalyseRateArr3.analyse_buyRate*10;
+                        chart4View_Five.config.data.datasets[3].data[0].r = vue.winAnalyseRateArr4.analyse_buyRate*10;
+                        chart4View_Five.config.data.datasets[4].data[0].r = vue.winAnalyseRateArr5.analyse_buyRate*10;
+
+                        chart4View_Five.config.data.datasets[0].label = "离散点：出售阈值,胜率%,购买阈值*10%";
+                        chart4View_Five.config.data.datasets[1].label = "离散点：出售阈值,胜率%,购买阈值*10%";
+                        chart4View_Five.config.data.datasets[2].label = "离散点：出售阈值,胜率%,购买阈值*10%";
+                        chart4View_Five.config.data.datasets[3].label = "离散点：出售阈值,胜率%,购买阈值*10%";
+                        chart4View_Five.config.data.datasets[4].label = "离散点：出售阈值,胜率%,购买阈值*10%";
+
+
+                        //平均盈利率
+                        chart4View_Eight.config.data.datasets[0].data[0].x = vue.avgProfitAnalyseArr1.analyse_sellRate;
+                        chart4View_Eight.config.data.datasets[1].data[0].x = vue.avgProfitAnalyseArr2.analyse_sellRate;
+                        chart4View_Eight.config.data.datasets[2].data[0].x = vue.avgProfitAnalyseArr3.analyse_sellRate;
+                        chart4View_Eight.config.data.datasets[3].data[0].x = vue.avgProfitAnalyseArr4.analyse_sellRate;
+                        chart4View_Eight.config.data.datasets[4].data[0].x = vue.avgProfitAnalyseArr5.analyse_sellRate;
+
+                        chart4View_Eight.config.data.datasets[0].data[0].y = vue.avgProfitAnalyseArr1.winRate;
+                        chart4View_Eight.config.data.datasets[1].data[0].y = vue.avgProfitAnalyseArr2.winRate;
+                        chart4View_Eight.config.data.datasets[2].data[0].y = vue.avgProfitAnalyseArr3.winRate;
+                        chart4View_Eight.config.data.datasets[3].data[0].y = vue.avgProfitAnalyseArr4.winRate;
+                        chart4View_Eight.config.data.datasets[4].data[0].y = vue.avgProfitAnalyseArr5.winRate;
+
+                        chart4View_Eight.config.data.datasets[0].data[0].r = vue.avgProfitAnalyseArr1.analyse_buyRate*10;
+                        chart4View_Eight.config.data.datasets[1].data[0].r = vue.avgProfitAnalyseArr2.analyse_buyRate*10;
+                        chart4View_Eight.config.data.datasets[2].data[0].r = vue.avgProfitAnalyseArr3.analyse_buyRate*10;
+                        chart4View_Eight.config.data.datasets[3].data[0].r = vue.avgProfitAnalyseArr4.analyse_buyRate*10;
+                        chart4View_Eight.config.data.datasets[4].data[0].r = vue.avgProfitAnalyseArr5.analyse_buyRate*10;
+
+                        chart4View_Eight.config.data.datasets[0].label = "离散点：出售阈值,平均盈利率%,购买阈值*10%";
+                        chart4View_Eight.config.data.datasets[1].label = "离散点：出售阈值,平均盈利率%,购买阈值*10%";
+                        chart4View_Eight.config.data.datasets[2].label = "离散点：出售阈值,平均盈利率%,购买阈值*10%";
+                        chart4View_Eight.config.data.datasets[3].label = "离散点：出售阈值,平均盈利率%,购买阈值*10%";
+                        chart4View_Eight.config.data.datasets[4].label = "离散点：出售阈值,平均盈利率%,购买阈值*10%";
+
+
+
+                        chart4View_Five.update();
+                        chart4View_Six.update();
+                        chart4View_Seven.update();
+                        chart4View_Eight.update();
+                        //console.log(vue.result);
+                        //生成分析报告
+                        vue.buildAnalyseReport();
+
+
+
+
+                    })
+                },
+
+                changeParam:function () {
+                        //重新请求数据，由下拉选择框绑定的ma值去获取对应ma值的数据，默认为5
+                        vue.simulate();
+                },
+                changeParamWithFlushDate:function () {
+                        vue.simulate();
+                },
+                //局部过滤器方法
+                formatNumberFilter:function (value,decimal) {
+                    if(decimal==null)
+                        decimal = 0;
+
+                    return formatNumber(value,decimal, ".",",");
+                },
+                //分析算法
+                //1、胜率分析算法
+                winRateAnalyse:function (max,cmp,buyRate,sellRate) {
+                    if (parseFloat(max)<parseFloat(cmp)){
+                        max  = cmp;
+                        //记录当前buyRate、sellRate、max值
+                        if (buyRate==1.01){ //第一组数据
+                            vue.winAnalyseRateArr1.analyse_buyRate = buyRate;
+                            vue.winAnalyseRateArr1.analyse_sellRate = sellRate;
+                            vue.winAnalyseRateArr1.winRate = max;
+
+                            // console.log("buy="+vue.winAnalyseRateArr1.analyse_buyRate);
+                            // console.log("sell="+vue.winAnalyseRateArr1.analyse_sellRate);
+                            // console.log("winRate="+vue.winAnalyseRateArr1.winRate);
+                        }else if (buyRate==1.02){
+                            vue.winAnalyseRateArr2.analyse_buyRate = buyRate;
+                            vue.winAnalyseRateArr2.analyse_sellRate = sellRate;
+                            vue.winAnalyseRateArr2.winRate = max;
+
+                            // console.log("buy="+vue.winAnalyseRateArr2.analyse_buyRate);
+                            // console.log("sell="+vue.winAnalyseRateArr2.analyse_sellRate);
+                            // console.log("winRate="+vue.winAnalyseRateArr2.winRate);
+                        }else if (buyRate==1.03){
+                            vue.winAnalyseRateArr3.analyse_buyRate = buyRate;
+                            vue.winAnalyseRateArr3.analyse_sellRate = sellRate;
+                            vue.winAnalyseRateArr3.winRate = max;
+
+                            // console.log("buy="+vue.winAnalyseRateArr3.analyse_buyRate);
+                            // console.log("sell="+vue.winAnalyseRateArr3.analyse_sellRate);
+                            // console.log("winRate="+vue.winAnalyseRateArr3.winRate);
+                        }else if (buyRate==1.04){
+                            vue.winAnalyseRateArr4.analyse_buyRate = buyRate;
+                            vue.winAnalyseRateArr4.analyse_sellRate = sellRate;
+                            vue.winAnalyseRateArr4.winRate = max;
+
+                            // console.log("buy="+vue.winAnalyseRateArr4.analyse_buyRate);
+                            // console.log("sell="+vue.winAnalyseRateArr4.analyse_sellRate);
+                            // console.log("winRate="+vue.winAnalyseRateArr4.winRate);
+                        }else if (buyRate==1.05){
+                            vue.winAnalyseRateArr5.analyse_buyRate = buyRate;
+                            vue.winAnalyseRateArr5.analyse_sellRate = sellRate;
+                            vue.winAnalyseRateArr5.winRate = max;
+
+                            // console.log("buy="+vue.winAnalyseRateArr5.analyse_buyRate);
+                            // console.log("sell="+vue.winAnalyseRateArr5.analyse_sellRate);
+                            // console.log("winRate="+vue.winAnalyseRateArr5.winRate);
+                        }
+                    }
+                    return max;
+                },
+                //2、平均胜率分析算法
+                avgWinRateAnalyse:function (max,cmp,buyRate,sellRate) {
+                    if (parseFloat(max)<parseFloat(cmp)){
+                       // console.log("max="+max+"cmp="+cmp);
+                        max  = cmp;
+                       // console.log("max="+max);
+                        //记录当前buyRate、sellRate、max值
+                        if (buyRate==1.01){ //第一组数据
+                            vue.avgProfitAnalyseArr1.analyse_buyRate = buyRate;
+                            vue.avgProfitAnalyseArr1.analyse_sellRate = sellRate;
+                            vue.avgProfitAnalyseArr1.winRate = max;
+
+                            // console.log("buy="+vue.avgProfitAnalyseArr1.analyse_buyRate);
+                            // console.log("sell="+vue.avgProfitAnalyseArr1.analyse_sellRate);
+                            // console.log("avgWinRate="+vue.avgProfitAnalyseArr1.winRate);
+                        }else if (buyRate==1.02){
+                            vue.avgProfitAnalyseArr2.analyse_buyRate = buyRate;
+                            vue.avgProfitAnalyseArr2.analyse_sellRate = sellRate;
+                            vue.avgProfitAnalyseArr2.winRate = max;
+
+                            // console.log("buy="+vue.winAnalyseRateArr2.analyse_buyRate);
+                            // console.log("sell="+vue.winAnalyseRateArr2.analyse_sellRate);
+                            // console.log("avgWinRate="+vue.winAnalyseRateArr2.winRate);
+                        }else if (buyRate==1.03){
+                            vue.avgProfitAnalyseArr3.analyse_buyRate = buyRate;
+                            vue.avgProfitAnalyseArr3.analyse_sellRate = sellRate;
+                            vue.avgProfitAnalyseArr3.winRate = max;
+
+                            // console.log("buy="+vue.avgProfitAnalyseArr3.analyse_buyRate);
+                            // console.log("sell="+vue.avgProfitAnalyseArr3.analyse_sellRate);
+                            // console.log("avgWinRate="+vue.avgProfitAnalyseArr3.winRate);
+                        }else if (buyRate==1.04){
+                            vue.avgProfitAnalyseArr4.analyse_buyRate = buyRate;
+                            vue.avgProfitAnalyseArr4.analyse_sellRate = sellRate;
+                            vue.avgProfitAnalyseArr4.winRate = max;
+
+                            // console.log("buy="+vue.avgProfitAnalyseArr4.analyse_buyRate);
+                            // console.log("sell="+vue.avgProfitAnalyseArr4.analyse_sellRate);
+                            // console.log("avgWinRate="+vue.avgProfitAnalyseArr4.winRate);
+                        }else if (buyRate==1.05){
+                            vue.avgProfitAnalyseArr5.analyse_buyRate = buyRate;
+                            vue.avgProfitAnalyseArr5.analyse_sellRate = sellRate;
+                            vue.avgProfitAnalyseArr5.winRate = max;
+
+                            // console.log("buy="+vue.avgProfitAnalyseArr5.analyse_buyRate);
+                            // console.log("sell="+vue.avgProfitAnalyseArr5.analyse_sellRate);
+                            // console.log("avgWinRate="+vue.avgProfitAnalyseArr5.winRate);
+                        }
+                    }
+                    return max;
+                },
+                //Analyse生成分析报告
+                buildAnalyseReport:function () {
+                    var that = this;
+                   vue.AnalyseReport.indexes.code = that.code;
+                    vue.AnalyseReport.indexes.name = that.name;
+                    vue.AnalyseReport.ma = that.ma;
+                   // console.log(vue.AnalyseReport.ma);
+                    vue.AnalyseReport.winReport[0] = vue.winAnalyseRateArr1;
+                    vue.AnalyseReport.winReport[1] = vue.winAnalyseRateArr2;
+                    vue.AnalyseReport.winReport[2] = vue.winAnalyseRateArr3;
+                    vue.AnalyseReport.winReport[3] = vue.winAnalyseRateArr4;
+                    vue.AnalyseReport.winReport[4] = vue.winAnalyseRateArr5;
+
+                    vue.AnalyseReport.avgProfitReport[0] = vue.avgProfitAnalyseArr1;
+                    vue.AnalyseReport.avgProfitReport[1] = vue.avgProfitAnalyseArr2;
+                    vue.AnalyseReport.avgProfitReport[2] = vue.avgProfitAnalyseArr3;
+                    vue.AnalyseReport.avgProfitReport[3] = vue.avgProfitAnalyseArr4;
+                    vue.AnalyseReport.avgProfitReport[4] = vue.avgProfitAnalyseArr5;
+                    //console.log(vue.AnalyseReport.avgProfitReport[0]);
+                },
+
+
+
+            }
+        });
+
+        //图表chart.js
+        var ctx4Canvas = $('.canvas4View')[0].getContext("2d");
+        chart4View_One = new Chart(ctx4Canvas,{
+            type:'line', //线形图
+            data:{
+                labels: '',//横坐标
+                datasets:[
+                    {
+                        label: '', //这组数据的名称
+                        data: [],//具体数据
+                        borderColor: '#FF4040',//线条颜色
+                        backgroundColor: '#FF4040',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    },
+                    {
+                        label: '', //这组数据的名称
+                        data: [],//具体数据
+                        borderColor: '#07d0ff',//线条颜色
+                        backgroundColor: '#07d0ff',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    },
+                    {
+                        label: '', //这组数据的名称
+                        data: [],//具体数据
+                        borderColor: '#ffee00',//线条颜色
+                        backgroundColor: '#ffee00',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    },
+                    {
+                        label: '', //这组数据的名称
+                        data: [],//具体数据
+                        borderColor: '#be98ff',//线条颜色
+                        backgroundColor: '#be98ff',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    },
+                    {
+                        label: '', //这组数据的名称
+                        data: [],//具体数据
+                        borderColor: '#5D98C8',//线条颜色
+                        backgroundColor: '#5D98C8',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    },
+                ]
+            },
+            options:{ //其他选项
+                title:{
+                    display:true,
+                    text: '数据可视化: 交易统计-胜率拟合  折线图'
+                },
+                responsive:true,// 表示有新数据的时候会重新画
+                responsiveAnimationDuration:3000,//重画延迟
+                tooltips: {//鼠标移动在图标上（数据点）显示的信息
+                    intersect: false, //鼠标不在图标上也会提示信息
+                    mode: 'index', //显示模式
+                    callbacks: {//表示提示信息的格式是： 标签名 ： 取两位小数的数值
+                        label: function(tooltipItem, myData) { //单个项的提示文本
+                            var label = myData.datasets[tooltipItem.datasetIndex].label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            label += parseFloat(tooltipItem.value).toFixed(2);
+                            return label;
+                        }
+                    }
+                },
+                scales: {
+                    yAxes: [{
+                        ticks: {
+                            beginAtZero: false,
+                        }
+                    }]
+                },
+            }
+        });
+
+        //图表chart.js
+        var ctx4Canvas2 = $('.canvas4View')[1].getContext("2d");
+        chart4View_Two = new Chart(ctx4Canvas2,{
+            type:'bar', //柱形图
+            data:{
+                labels: '',//横坐标
+                datasets:[
+                    {
+                        label: '', //这组数据的名称
+                        data: [],//具体数据
+                        borderColor: '#FF4040',//线条颜色
+                        backgroundColor: '#FF4040',
+                        borderWidth: 1.2,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    },
+                    {
+                        label: '', //这组数据的名称
+                        data: [],//具体数据
+                        borderColor: '#07d0ff',//线条颜色
+                        backgroundColor: '#07d0ff',
+                        borderWidth: 1.2,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    },
+                    {
+                        label: '', //这组数据的名称
+                        data: [],//具体数据
+                        borderColor: '#ffee00',//线条颜色
+                        backgroundColor: '#ffee00',
+                        borderWidth: 1.2,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    },
+                    {
+                        label: '', //这组数据的名称
+                        data: [],//具体数据
+                        borderColor: '#be98ff',//线条颜色
+                        backgroundColor: '#be98ff',
+                        borderWidth: 1.2,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    },
+                    {
+                        label: '', //这组数据的名称
+                        data: [],//具体数据
+                        borderColor: '#5D98C8',//线条颜色
+                        backgroundColor: '#5D98C8',
+                        borderWidth: 1.2,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    },
+                ]
+            },
+            options:{ //其他选项
+                title:{
+                    display:true,
+                    text: '数据可视化: 交易统计-胜率拟合  柱形图'
+                },
+                responsive:true,// 表示有新数据的时候会重新画
+                responsiveAnimationDuration:3000,//重画延迟
+                tooltips: {//鼠标移动在图标上（数据点）显示的信息
+                    intersect: false, //鼠标不在图标上也会提示信息
+                    mode: 'index', //显示模式
+                    callbacks: {//表示提示信息的格式是： 标签名 ： 取两位小数的数值
+                        label: function(tooltipItem, myData) { //单个项的提示文本
+                            var label = myData.datasets[tooltipItem.datasetIndex].label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            label += parseFloat(tooltipItem.value).toFixed(2);
+                            return label;
+                        }
+                    }
+                },
+                scales: {
+                    yAxes: [{
+                        ticks: {
+                            beginAtZero: false,
+                        }
+                    }]
+                },
+            }
+        });
+
+        var ctx4Canvas3 = $('.canvas4View')[2].getContext("2d");
+        chart4View_Three = new Chart(ctx4Canvas3,{
+            type:'line', //线形图
+            data:{
+                labels: '',//横坐标
+                datasets:[
+                    {
+                        label: '', //这组数据的名称
+                        data: [],//具体数据
+                        borderColor: '#FF4040',//线条颜色
+                        backgroundColor: '#FF4040',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    },
+                    {
+                        label: '', //这组数据的名称
+                        data: [],//具体数据
+                        borderColor: '#07d0ff',//线条颜色
+                        backgroundColor: '#07d0ff',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    },
+                    {
+                        label: '', //这组数据的名称
+                        data: [],//具体数据
+                        borderColor: '#ffee00',//线条颜色
+                        backgroundColor: '#ffee00',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    },
+                    {
+                        label: '', //这组数据的名称
+                        data: [],//具体数据
+                        borderColor: '#be98ff',//线条颜色
+                        backgroundColor: '#be98ff',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    },
+                    {
+                        label: '', //这组数据的名称
+                        data: [],//具体数据
+                        borderColor: '#5D98C8',//线条颜色
+                        backgroundColor: '#5D98C8',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    },
+                ]
+            },
+            options:{ //其他选项
+                title:{
+                    display:true,
+                    text: '数据可视化: 交易统计-平均盈利率拟合  折线图'
+                },
+                responsive:true,// 表示有新数据的时候会重新画
+                responsiveAnimationDuration:3000,//重画延迟
+                tooltips: {//鼠标移动在图标上（数据点）显示的信息
+                    intersect: false, //鼠标不在图标上也会提示信息
+                    mode: 'index', //显示模式
+                    callbacks: {//表示提示信息的格式是： 标签名 ： 取两位小数的数值
+                        label: function(tooltipItem, myData) { //单个项的提示文本
+                            var label = myData.datasets[tooltipItem.datasetIndex].label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            label += parseFloat(tooltipItem.value).toFixed(2);
+                            return label;
+                        }
+                    }
+                },
+                scales: {
+                    yAxes: [{
+                        ticks: {
+                            beginAtZero: false,
+                        }
+                    }]
+                },
+            }
+        });
+
+        var ctx4Canvas4 = $('.canvas4View')[3].getContext("2d");
+        chart4View_Four = new Chart(ctx4Canvas4,{
+            type:'bar', //柱形图
+            data:{
+                labels: '',//横坐标
+                datasets:[
+                    {
+                        label: '', //这组数据的名称
+                        data: [],//具体数据
+                        borderColor: '#FF4040',//线条颜色
+                        backgroundColor: '#FF4040',
+                        borderWidth: 1.2,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    },
+                    {
+                        label: '', //这组数据的名称
+                        data: [],//具体数据
+                        borderColor: '#07d0ff',//线条颜色
+                        backgroundColor: '#07d0ff',
+                        borderWidth: 1.2,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    },
+                    {
+                        label: '', //这组数据的名称
+                        data: [],//具体数据
+                        borderColor: '#ffee00',//线条颜色
+                        backgroundColor: '#ffee00',
+                        borderWidth: 1.2,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    },
+                    {
+                        label: '', //这组数据的名称
+                        data: [],//具体数据
+                        borderColor: '#be98ff',//线条颜色
+                        backgroundColor: '#be98ff',
+                        borderWidth: 1.2,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    },
+                    {
+                        label: '', //这组数据的名称
+                        data: [],//具体数据
+                        borderColor: '#5D98C8',//线条颜色
+                        backgroundColor: '#5D98C8',
+                        borderWidth: 1.2,
+                        pointRadius: 0,
+                        fill: false,
+                        lineTension: 0,
+                    },
+                ]
+            },
+            options:{ //其他选项
+                title:{
+                    display:true,
+                    text: '数据可视化: 交易统计-平均盈利率拟合  柱形图'
+                },
+                responsive:true,// 表示有新数据的时候会重新画
+                responsiveAnimationDuration:3000,//重画延迟
+                tooltips: {//鼠标移动在图标上（数据点）显示的信息
+                    intersect: false, //鼠标不在图标上也会提示信息
+                    mode: 'index', //显示模式
+                    callbacks: {//表示提示信息的格式是： 标签名 ： 取两位小数的数值
+                        label: function(tooltipItem, myData) { //单个项的提示文本
+                            var label = myData.datasets[tooltipItem.datasetIndex].label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            label += parseFloat(tooltipItem.value).toFixed(2);
+                            return label;
+                        }
+                    }
+                },
+                scales: {
+                    yAxes: [{
+                        ticks: {
+                            beginAtZero: false,
+                        }
+                    }]
+                },
+            }
+        });
+
+        //气泡拟合对照图
+        var ctx4Canvas6 = $('.canvas4ViewResult')[0].getContext("2d");
+        chart4View_Six = new Chart(ctx4Canvas6,{
+            type:'bubble', //气泡图
+            data:{
+                labels: [],
+                datasets:[
+                    {
+                        data:[
+                            {
+                                x: 0, //出售阈值
+                                y: 0, //胜率
+                                r: 0//购买阈值
+                            }
+                        ],
+                        label:[],
+                        backgroundColor:"#FF4040"
+                    },
+                    {
+                        data:[  {
+                            x: 0,
+                            y: 0,
+                            r: 0
+                        }],
+                        label:[],
+                        backgroundColor:"#07d0ff"
+                    },
+                    {
+                        data:[{
+                            x: 0,
+                            y: 0,
+                            r: 0
+                        }],
+                        label:[],
+                        backgroundColor:"#ffee00"
+                    },
+                    {
+                        data:[{
+                            x: 0,
+                            y: 0,
+                            r: 0
+                        }],
+                        label:[],
+                        backgroundColor:"#be98ff"
+                    },
+                    {
+                        data:[ {
+                            x: 0,
+                            y: 0,
+                            r: 0
+                        }],
+                        label:[],
+                        backgroundColor:"#5D98C8"
+                    },
+
+                ]
+            },
+            options:{ //其他选项
+                title:{
+                    display:true,
+                    text: '数据拟合样本对照组: 交易统计- "最优" 胜率组合  离散气泡图'
+                },
+                responsive:true,// 表示有新数据的时候会重新画
+                responsiveAnimationDuration:3000,//重画延迟
+            }
+        });
+
+        //气泡拟合完成图
+        var ctx4Canvas5 = $('.canvas4ViewResult')[1].getContext("2d");
+        chart4View_Five = new Chart(ctx4Canvas5,{
+            type:'bubble', //气泡图
+            data:{
+                labels: [],
+                datasets:[
+                    {
+                        data:[
+                            {
+                                x: 0, //购买阈值
+                                y: 0, //胜率
+                                r: 0//卖出阈值
+                            }
+                        ],
+                        label:[],
+                        backgroundColor:["#FF4040"]
+                    },
+                    {
+                        data:[  {
+                            x: 0,
+                            y: 0,
+                            r: 0
+                        }],
+                        label:[],
+                        backgroundColor:["#07d0ff"]
+                    },
+                    {
+                        data:[{
+                            x: 0,
+                            y: 0,
+                            r: 0
+                        }],
+                        label:[],
+                        backgroundColor:["#ffee00"]
+                    },
+                    {
+                        data:[{
+                            x: 0,
+                            y: 0,
+                            r: 0
+                        }],
+                        label:[],
+                        backgroundColor:["#be98ff"]
+                    },
+                    {
+                        data:[ {
+                            x: 0,
+                            y: 0,
+                            r: 0
+                        }],
+                        label:[],
+                        backgroundColor:["#5D98C8"]
+                    },
+
+                ]
+            },
+            options:{ //其他选项
+                title:{
+                    display:true,
+                    text: '数据拟合样本分析结果: 交易统计- "最优" 胜率组合  离散气泡图'
+                },
+                responsive:true,// 表示有新数据的时候会重新画
+                responsiveAnimationDuration:3000,//重画延迟
+            }
+        });
+
+
+        //平均盈利对照气泡图
+        var ctx4Canvas7 = $('.canvas4ViewResult')[2].getContext("2d");
+        chart4View_Seven = new Chart(ctx4Canvas7,{
+            type:'bubble', //气泡图
+            data:{
+                labels: [],
+                datasets:[
+                    {
+                        data:[
+                            {
+                                x: 0, //购买阈值
+                                y: 0, //胜率
+                                r: 0//卖出阈值
+                            }
+                        ],
+                        label:[],
+                        backgroundColor:"#FF4040"
+                    },
+                    {
+                        data:[  {
+                            x: 0,
+                            y: 0,
+                            r: 0
+                        }],
+                        label:[],
+                        backgroundColor:"#07d0ff"
+                    },
+                    {
+                        data:[{
+                            x: 0,
+                            y: 0,
+                            r: 0
+                        }],
+                        label:[],
+                        backgroundColor:"#ffee00"
+                    },
+                    {
+                        data:[{
+                            x: 0,
+                            y: 0,
+                            r: 0
+                        }],
+                        label:[],
+                        backgroundColor:["#be98ff"]
+                    },
+                    {
+                        data:[ {
+                            x: 0,
+                            y: 0,
+                            r: 0
+                        }],
+                        label:[],
+                        backgroundColor:"#5D98C8"
+                    },
+
+                ]
+            },
+            options:{ //其他选项
+                title:{
+                    display:true,
+                    text: '数据拟合样本对照组: 交易统计- "最优" 平均盈利率组合  离散气泡图'
+                },
+                responsive:true,// 表示有新数据的时候会重新画
+                responsiveAnimationDuration:3000,//重画延迟
+            }
+        });
+
+        //平均盈利率气泡拟合完成图
+        var ctx4Canvas8 = $('.canvas4ViewResult')[3].getContext("2d");
+        chart4View_Eight = new Chart(ctx4Canvas8,{
+            type:'bubble', //气泡图
+            data:{
+                labels: [],
+                datasets:[
+                    {
+                        data:[
+                            {
+                                x: 0, //购买阈值
+                                y: 0, //胜率
+                                r: 0//卖出阈值
+                            }
+                        ],
+                        label:[],
+                        backgroundColor:["#FF4040"]
+                    },
+                    {
+                        data:[  {
+                            x: 0,
+                            y: 0,
+                            r: 0
+                        }],
+                        label:[],
+                        backgroundColor:["#07d0ff"]
+                    },
+                    {
+                        data:[{
+                            x: 0,
+                            y: 0,
+                            r: 0
+                        }],
+                        label:[],
+                        backgroundColor:["#ffee00"]
+                    },
+                    {
+                        data:[{
+                            x: 0,
+                            y: 0,
+                            r: 0
+                        }],
+                        label:[],
+                        backgroundColor:["#be98ff"]
+                    },
+                    {
+                        data:[ {
+                            x: 0,
+                            y: 0,
+                            r: 0
+                        }],
+                        label:[],
+                        backgroundColor:["#5D98C8"]
+                    },
+
+                ]
+            },
+            options:{ //其他选项
+                title:{
+                    display:true,
+                    text: '数据拟合样本分析结果: 交易统计- "最优" 平均盈利率组合  离散气泡图'
+                },
+                responsive:true,// 表示有新数据的时候会重新画
+                responsiveAnimationDuration:3000,//重画延迟
+            }
+        });
+
+
+
+
+
+
+
+    })
+
+    //获取上一页的参数
+    function getUrlParms(para){
+        var search=location.search; //页面URL的查询部分字符串
+        var arrPara=new Array(); //参数数组。数组单项为包含参数名和参数值的字符串，如“para=value”
+        var arrVal=new Array(); //参数值数组。用于存储查找到的参数值
+
+        if(search!=""){
+            var index=0;
+            search=search.substr(1); //去除开头的“?”
+            arrPara=search.split("&");
+
+            for(i in arrPara){
+                var paraPre=para+"="; //参数前缀。即参数名+“=”，如“para=”
+                if(arrPara[i].indexOf(paraPre)==0&& paraPre.length<arrPara[i].length){
+                    arrVal[index]=decodeURI(arrPara[i].substr(paraPre.length)); //顺带URI解码避免出现乱码
+                    index++;
+                }
+            }
+        }
+
+        if(arrVal.length==1){
+            return arrVal[0];
+        }else if(arrVal.length==0){
+            return null;
+        }else{
+            return arrVal;
+        }
+    }
+
+
+
+</script>
+
+<style>
+    table.inputTable{
+        width:100%;
+    }
+    table.inputTable td{
+        padding:20px 20px;
+    }
+
+    table{
+        margin:20px;
+    }
+
+    #workingArea{
+        margin-left: 16% !important;
+    }
+
+    body {
+        font-size: 1.4rem !important;
+    }
+
+    a {
+        font-size: 1.4rem !important;
+    }
+
+    #mainNav{
+        position: sticky !important;
+    }
+    .navbar-brand {
+        padding-top: 1.3rem !important;
+        padding-bottom: .75rem;
+        font-size: 1.7rem !important;
+        background-color: rgba(0, 0, 0, .25);
+        box-shadow: inset -1px 0 0 rgba(0, 0, 0, .25);
+    }
+
+    .navbar .form-control {
+        padding: .75rem 1rem;
+        border-width: 0;
+        border-radius: 0;
+    }
+
+    .form-control-dark {
+        color: #fff;
+        background-color: rgba(255, 255, 255, .1);
+        border-color: rgba(255, 255, 255, .1);
+    }
+
+    .form-control-dark:focus {
+        border-color: transparent;
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, .25);
+    }
+
+    .feather {
+        width: 16px;
+        height: 16px;
+        vertical-align: text-bottom;
+    }
+
+    /*
+     * Sidebar
+     */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 100; /* Behind the navbar */
+        padding: 0;
+        box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+    }
+
+    .sidebar-sticky {
+        position: -webkit-sticky;
+        position: sticky;
+        top: 48px; /* Height of navbar */
+        height: calc(100vh - 48px);
+        padding-top: .5rem;
+        overflow-x: hidden;
+        overflow-y: auto; /* Scrollable contents if viewport is shorter than content. */
+    }
+
+    .sidebar .nav-link {
+        font-weight: 500;
+        color: #333;
+    }
+
+    .sidebar .nav-link .feather {
+        margin-right: 4px;
+        color: #999;
+    }
+
+    .sidebar .nav-link.active {
+        color: #007bff;
+    }
+
+    .sidebar .nav-link:hover .feather,
+    .sidebar .nav-link.active .feather {
+        color: inherit;
+    }
+
+    .sidebar-heading {
+        font-size: .75rem;
+        text-transform: uppercase;
+    }
+
+    /*
+     * Navbar
+     */
+
+    .navbar-brand {
+        padding-top: .75rem;
+        padding-bottom: .75rem;
+        font-size: 1rem;
+        background-color: rgba(0, 0, 0, .25);
+        box-shadow: inset -1px 0 0 rgba(0, 0, 0, .25);
+    }
+
+    .navbar .form-control {
+        padding: .75rem 1rem;
+        border-width: 0;
+        border-radius: 0;
+    }
+
+    .form-control-dark {
+        color: #fff;
+        background-color: rgba(255, 255, 255, .1);
+        border-color: rgba(255, 255, 255, .1);
+    }
+
+    .form-control-dark:focus {
+        border-color: transparent;
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, .25);
+    }
+
+    /*
+     * Utilities
+     */
+
+    .border-top { border-top: 1px solid #e5e5e5; }
+    .border-bottom { border-bottom: 1px solid #e5e5e5; }
+
+
+
+</style>
+
+<body>
+<nav th:replace="Module/bar :: topBar"></nav>
+<div class="container-fluid">
+    <div class="row">
+        <nav th:replace="Module/bar::sidebar(activeUri='result.html')"></nav>
+    </div>
+    <main role="main" class="col-md-8 ml-sm-auto col-lg-10 pt-3 px-4" id="workingArea">
+        <div>
+            <!--指数代码区域-->
+            <span class="label label-info">回测参数</span>
+            <table th:replace="Module/inputTableResult::html"></table>
+
+
+            <!--交易统计拟合 可视化 展示区域-->
+            <span class="label label-info">数据可视化</span>
+            <div  class="div4chart" style="margin:0px auto; width:80%">
+                <!--拟合胜率 曲线图和柱形图-->
+                <canvas class='canvas4View'></canvas>
+                <br>
+                <br>
+                <canvas class='canvas4View'></canvas>
+                <!--拟合平均盈利 曲线图和柱形图-->
+                <br>
+                <br>
+                <canvas class='canvas4View'></canvas>
+                <br>
+                <br>
+                <canvas class='canvas4View'></canvas>
+            </div>
+
+            <!--拟合数据分析结果 展示区域-->
+            <span class="label label-info">拟合-数据分析结果</span>
+            <div  class="div4chart" style="margin:0px auto; width:80%">
+                <!--拟合胜率分析结果 气泡图对照和气泡拟合完成图-->
+                <canvas class='canvas4ViewResult'></canvas>
+                <br>
+                <br>
+                <canvas class='canvas4ViewResult'></canvas>
+                <br>
+                <br>
+                <!--拟合平均盈利分析结果 气泡图对照和气泡拟合完成图-->
+                <canvas class='canvas4ViewResult'></canvas>
+                <br>
+                <br>
+                <canvas class='canvas4ViewResult'></canvas>
+            </div>
+
+            <span class="label label-info">拟合-数据分析报告</span>
+            <table th:replace="Module/tradeCalcuReport::html_win"></table>
+            <table th:replace="Module/tradeCalcuReport::html_avg"></table>
+
+            <span class="label label-info">拟合-预测分析</span>
+            <div></div>
+
+            <!--交易统计区域-->
+            <div class="label label-warning">拟合-交易统计样本数据</div>
+            <table th:replace="Module/tradeCalcuResult::html"></table>
+
+        </div>
+    </main>
+</div>
+    <div th:replace="include/footer::html" ></div>
+</body>
+</html>

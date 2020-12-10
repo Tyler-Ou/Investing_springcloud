@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile name="Maven default annotation processors profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="feign-trading-backtest-server" />
+        <module name="third-part-index-data-project" />
+        <module name="feign-trading-backtest-view" />
+        <module name="index-gather-store-service" />
+        <module name="eureka-server" />
+        <module name="index-codes-service" />
+        <module name="index-zuul-service" />
+        <module name="index-data-service" />
+      </profile>
+    </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="testChildProject" target="1.7" />
+      <module name="trend-trading-backtest-service" target="1.7" />
+    </bytecodeTargetLevel>
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="eureka-server" options="-parameters" />
+      <module name="feign-trading-backtest-server" options="-parameters" />
+      <module name="feign-trading-backtest-view" options="-parameters" />
+      <module name="index-codes-service" options="-parameters" />
+      <module name="index-data-service" options="-parameters" />
+      <module name="index-gather-store-service" options="-parameters" />
+      <module name="index-zuul-service" options="-parameters" />
+      <module name="third-part-index-data-project" options="-parameters" />
+      <module name="trend-trading-backtest-service" options="-parameters" />
+    </option>
+  </component>
+</project>

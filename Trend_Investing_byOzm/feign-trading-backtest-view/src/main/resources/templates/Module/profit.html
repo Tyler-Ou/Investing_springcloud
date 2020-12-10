@@ -1,0 +1,36 @@
+<table th:fragment="html" class="table table-striped table-bordered table-condensed" >
+    <thead>
+    <th>投资类型</th>
+    <th>投资时长 (年)</th>
+    <th>1000元投资收益</th>
+    <th>总收益率</th>
+    <th>年化收益率</th>
+    </thead>
+    <tbody>
+
+    <tr>
+        <td>指数投资</td>
+        <td>{{years|formatNumberFilter(2)}} </td>
+        <td>{{(indexProfit+1)*1000|formatMoneyFilter}}</td>
+        <td>{{indexProfit*100|formatNumberFilter(2)}}%</td>
+        <td>{{indexYearsProfit*100|formatNumberFilter(2)}}%</td>
+    </tr>
+
+    <tr>
+        <td>趋势投资</td>
+        <td>{{years|formatNumberFilter(2)}} </td>
+        <td>{{(trendProfit+1)*1000|formatMoneyFilter}}</td>
+        <td>{{trendProfit*100|formatNumberFilter(2)}}%</td>
+        <td>{{trendYearsProfit*100|formatNumberFilter(2)}}%</td>
+    </tr>
+
+    <tr>
+        <td>相对收益</td>
+        <td>n/a</td>
+        <td>{{(trendProfit-indexProfit)*1000|formatMoneyFilter}}</td>
+        <td>{{(trendProfit-indexProfit)*100|formatNumberFilter(2)}}%</td>
+        <td>{{(trendYearsProfit-indexYearsProfit)*100|formatNumberFilter(2)}}%</td>
+    </tr>
+
+    </tbody>
+</table>

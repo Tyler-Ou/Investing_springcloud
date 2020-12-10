@@ -1,0 +1,468 @@
+<!DOCTYPE html> <!--我的工作台用于导入指数数据-->
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="include/header::html('量化：我的工作台')" ></head>
+<script>
+    $(function () {
+        var data4Vue = {
+            userExampleList:'',//用户所有实例的数据
+            Examplelenth:0, //实例数量
+            publicNum:11,//公共实例数
+            //用于创建实例
+            userExample:{ //用户实例
+                p_code:'',//实例代码
+                p_name:'',//实例名称
+                file:null
+            }
+        }
+        var vue = new Vue({
+            el:"#workingArea",
+            data:data4Vue,
+            mounted:function () {
+                //this.init();
+                this.getEllm();
+            },
+            methods:{
+                //读取实例
+                getEllm:function(){
+                    var that = this;
+                    that.userExampleList = '';
+                    that.Examplelenth = 0;
+                    var url  = "http://127.0.0.1:8031/api-backtest/readUserConsole/";
+                    axios.get(url).then(function (response) {
+                            console.log(response.data);
+                            vue.userExampleList  = response.data.userExampleList;
+                            vue.Examplelenth = response.data.userExampleList.length;
+                    })
+
+                },
+                //实例创建
+                createElm:function(){
+                    //点击创建实例dialog窗体重新打开
+
+                    //实例名称、实例代码、文件非空判断
+                    var that = this;
+                    var code = that.userExample.p_code;
+                    var name = that.userExample.p_name;
+                    var file = that.userExample.file;
+                    console.log('code='+code+"name="+name);
+                    console.log(file);
+                    if (!that.isEmpty(code)&&!that.isEmpty(name)){
+                        if (file!=null){
+
+                            //axios.js 上传文件要用 formData 这种方式
+                            var formData = new FormData();
+                            formData.append("code",code);
+                            formData.append("name",name);
+                            formData.append("file",file);
+                            var url = "http://127.0.0.1:8031/api-backtest/userconsole";
+                            axios.post(url,formData).then(function (response) {
+                                //上传新数据后，重新刷新实例列表,并手动关闭模态窗体
+                                //console.log(response.data);
+                                if (response.data.response=="success"){
+                                    alert(response.data.msg);
+                                    $("#myModal").modal('hide');
+                                    //因为页面问题关闭模态窗体时，dialog无法关闭
+                                    //所以只能手动关闭dialog，打开在创建实例的点击方法中打开
+                                    var dialog =  document.getElementById("dialog");
+                                    dialog.style.display = "none";
+                                    //清空模态框数据
+                                    vue.userExample.p_code = '';
+                                    vue.userExample.p_name = '';
+                                    vue.userExample.file = null;
+                                    //刷新
+                                    vue.getEllm();
+
+                                }else{
+                                    alert(response.data.msg);
+                                }
+                            });
+                        }else{
+                            alert("请上传有效的实例数据");
+                            return;
+                        }
+                    }else{
+                        alert("请输入正确的实例名称或实例代码");
+                        return;
+                    }
+                },
+
+                //将实例导入分析策略
+                importAnalyse:function(id,status){
+                   // console.log("id="+id);
+                    if (status=="success"){
+                        alert("已导入无须重复操作");
+                        return;
+                    }else{
+                        var that = this;
+                        var url = "http://127.0.0.1:8031/api-backtest/importUserConsole?eid="+id;
+                        axios.get(url).then(function (response) {
+                            if (response.data.response=="success"){
+                                alert(response.data.msg);
+                                vue.getEllm(); //刷新实例
+                            }else{
+                                alert(response.data.msg);
+                            }
+                        })
+                    }
+
+                },
+                //导出至分析策略
+                uimportAnalyse:function(id,status){
+                    if (status=="ready"){
+                        alert("已导出无须重复操作");
+                        return;
+                    }else{
+                        var that = this;
+                        var url = "http://127.0.0.1:8031/api-backtest/importUserConsole?eid="+id;
+                        axios.get(url).then(function (response) {
+                            if (response.data.response=="success"){
+                                alert(response.data.msg);
+                                vue.getEllm(); //刷新实例
+                            }else{
+                                alert(response.data.msg);
+                            }
+                        })
+                    }
+
+                },
+
+
+                //获得已上传的实例
+                getExampleFile:function(){
+
+                },
+
+                //删除实例
+                removeElm:function(id){
+                    var that = this;
+                    var url  = "http://127.0.0.1:8031/api-backtest/removeUserConsole/"+id;
+                    axios.get(url).then(function (response) {
+                        console.log(response.data);
+                        alert(response.data);
+                        //刷新实例
+                        vue.getEllm();
+                    })
+                },
+
+
+                //获取文件内容
+                getFile:function(event){
+                    //console.log("file");
+                    this.userExample.file = event.target.files[0];
+                    //console.log( "file="+this.userExample.file);
+                },
+
+                //非空判断
+                isEmpty:function(str){
+                    if(str != null && str.length > 0){
+                        return false;
+                    }
+                    return true;
+                },
+
+                //页面跳转
+                jump:function (val) {
+                    //console.log(val);
+                    window.location.href = "http://127.0.0.1:8031/api-view/"+val
+                },
+                //打开模态对话框
+                openDialog:function(){
+                    //console.log("1");
+                    var dialog =  document.getElementById("dialog");
+                    dialog.style.display = "block";
+                },
+
+
+            }
+
+
+
+
+        })
+    })
+
+
+</script>
+<style>
+    table.inputTable{
+        width:100%;
+    }
+    table.inputTable td{
+        padding:20px 20px;
+    }
+
+    table{
+        margin:20px;
+    }
+
+    #workingArea{
+        margin-left: 16% !important;
+    }
+
+    body {
+        font-size: 1.4rem !important;
+    }
+
+    a {
+        font-size: 1.4rem !important;
+    }
+
+    #mainNav{
+        position: sticky !important;
+    }
+    .navbar-brand {
+        padding-top: 1.3rem !important;
+        padding-bottom: .75rem;
+        font-size: 1.7rem !important;
+        background-color: rgba(0, 0, 0, .25);
+        box-shadow: inset -1px 0 0 rgba(0, 0, 0, .25);
+    }
+
+    .navbar .form-control {
+        padding: .75rem 1rem;
+        border-width: 0;
+        border-radius: 0;
+    }
+
+    .form-control-dark {
+        color: #fff;
+        background-color: rgba(255, 255, 255, .1);
+        border-color: rgba(255, 255, 255, .1);
+    }
+
+    .form-control-dark:focus {
+        border-color: transparent;
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, .25);
+    }
+
+    .feather {
+        width: 16px;
+        height: 16px;
+        vertical-align: text-bottom;
+    }
+
+    /*
+     * Sidebar
+     */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 100; /* Behind the navbar */
+        padding: 0;
+        box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+    }
+
+    .sidebar-sticky {
+        position: -webkit-sticky;
+        position: sticky;
+        top: 48px; /* Height of navbar */
+        height: calc(100vh - 48px);
+        padding-top: .5rem;
+        overflow-x: hidden;
+        overflow-y: auto; /* Scrollable contents if viewport is shorter than content. */
+    }
+
+    .sidebar .nav-link {
+        font-weight: 500;
+        color: #333;
+    }
+
+    .sidebar .nav-link .feather {
+        margin-right: 4px;
+        color: #999;
+    }
+
+    .sidebar .nav-link.active {
+        color: #007bff;
+    }
+
+    .sidebar .nav-link:hover .feather,
+    .sidebar .nav-link.active .feather {
+        color: inherit;
+    }
+
+    .sidebar-heading {
+        font-size: .75rem;
+        text-transform: uppercase;
+    }
+
+    /*
+     * Navbar
+     */
+
+    .navbar-brand {
+        padding-top: .75rem;
+        padding-bottom: .75rem;
+        font-size: 1rem;
+        background-color: rgba(0, 0, 0, .25);
+        box-shadow: inset -1px 0 0 rgba(0, 0, 0, .25);
+    }
+
+    .navbar .form-control {
+        padding: .75rem 1rem;
+        border-width: 0;
+        border-radius: 0;
+    }
+
+    .form-control-dark {
+        color: #fff;
+        background-color: rgba(255, 255, 255, .1);
+        border-color: rgba(255, 255, 255, .1);
+    }
+
+    .form-control-dark:focus {
+        border-color: transparent;
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, .25);
+    }
+
+    /*
+     * Utilities
+     */
+
+    .border-top { border-top: 1px solid #e5e5e5; }
+    .border-bottom { border-bottom: 1px solid #e5e5e5; }
+
+    td{
+        font-size: 2rem !important;
+    }
+
+
+
+</style>
+<body>
+<nav th:replace="Module/bar :: topBar"></nav>
+<div class="container-fluid">
+    <div class="row">
+        <nav th:replace="Module/bar::sidebar(activeUri='userConsoleView.html')"></nav>
+    </div>
+    <main role="main" class="col-md-8 ml-sm-auto col-lg-10 pt-3 px-4" id="workingArea">
+       <div>
+         <div class="TopArr" style="width: 100%;display: flex;justify-content:space-around">
+            <div style="width: 45%">
+                <span class="label label-info">数据组实例</span>
+                <table class="table table-bordered" style="width: 100% !important;">
+                    <thead>
+                        <th>总容量</th>
+                        <th>公共实例</th>
+                        <th>运行中</th>
+                        <th>我的实例</th>
+                    </thead>
+                    <tbody>
+                       <tr>
+                           <td class="text-primary font-weight-bold">40</td>
+                           <td class="text-success font-weight-bold">{{publicNum}}</td>
+                           <td class="text-warning font-weight-bold">{{Examplelenth+publicNum}}</td>
+                           <td class="text-warning font-weight-bold">{{Examplelenth}}</td>
+                       </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div style="width: 45%">
+                <span class="label label-info">数据处理能力</span>
+                <table class="table table-bordered" style="width: 100% !important;">
+                    <thead>
+                        <th>处理容量</th>
+                        <th>总数据量</th>
+                    </thead>
+                    <tbody>
+                       <tr>
+                           <td class="text-primary font-weight-bold">1024 GiB</td>
+                           <td class="text-danger font-weight-bold">127837</td>
+                       </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+         <br>
+         <br>
+         <br>
+         <div class="TopArr" style="width: 100%;display: flex;justify-content:space-around">
+             <div style="width: 45%">
+                 <span class="label label-info">我的数据实例</span>
+             </div>
+             <div style="width: 45%">
+                 <div  style="width: 100% !important;"class="btn-group" role="group" aria-label="web">
+                     <button class="btn btn-info" @click="openDialog" data-toggle="modal" data-target="#myModal"><span class="glyphicon glyphicon-cloud-upload"></span> 创建实例</button>
+                     <button class="btn btn-info" @click="jump('view')"><span class="glyphicon glyphicon-equalizer" ></span>趋势分析</button>
+                     <button class="btn btn-info" @click="jump('result')"><span class="glyphicon glyphicon-random"></span> 拟合分析</button>
+                     <button class="btn btn-default" @click="getEllm"><span class="glyphicon glyphicon-refresh"></span>刷新</button>
+                 </div>
+             </div>
+         </div>
+           <div style="width: 100%">
+               <table class="table table-bordered">
+                   <thead>
+                   <th>序号</th>
+                   <th>实例代码</th>
+                   <th>实例名称</th>
+                   <th>实例</th>
+                   <th>状态</th>
+                   <th>创建日期</th>
+                   <th>操作</th>
+                   </thead>
+                   <tbody v-for="data,index in userExampleList">
+                   <tr>
+                       <td class="text-primary font-weight-bold">{{index+1}}</td>
+                       <td class="text-success font-weight-bold">{{data.code}}</td>
+                       <td class="text-success font-weight-bold">{{data.name}}</td>
+                       <td class="text-primary font-weight-bold"><a @click="getExampleFile" href="#">查看</a></td>
+                       <td class="text-primary font-weight-bold">
+                           <a v-if="data.status=='ready'" class="text-danger">未导入</a>
+                           <a v-if="data.status=='success'" class="text-success">已导入</a>
+                       </td>
+                       <td class="text-primary font-weight-bold">{{data.create_time|moment}}</td>
+                       <th>
+                           <button class="btn btn-success" type="button" @click="importAnalyse(data.id,data.status)">
+                               <span class="glyphicon glyphicon-save"></span>
+                               导入策略
+                           </button>
+                           <button class="btn btn-warning" type="button" @click="uimportAnalyse(data.id,data.status)">
+                               <span class="glyphicon glyphicon-open"></span>
+                               导出策略
+                           </button>
+                           <button class="btn btn-danger" @click="removeElm(data.id)">
+                               <span class="glyphicon glyphicon-trash" ></span>
+                               删除
+                           </button>
+                       </th>
+                   </tr>
+                   </tbody>
+               </table>
+           </div>
+       </div>
+        <!--创建实例模态窗口 使用ajax提交数据-->
+        <div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+            <div class="modal-dialog" id="dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h4 class="modal-title">创建实例</h4>
+                        <button data-dismiss="modal" class="close" type="button"><span aria-hidden="true">×</span><span class="sr-only">Close</span></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>数据组实例代码</p>
+                        <input type="text" class="form-control" name="p_code" v-model.trim="userExample.p_code">
+                        <p>数据组实例名称</p>
+                        <input type="text" class="form-control" name="p_name" v-model.trim="userExample.p_name">
+                        <p>数据组</p>
+                        <input type="file" accept=".json" name="p_data" @change="getFile($event)" >
+                        <a href="#">仅支持JSON格式文件,格式请查看演示实例</a>
+                    </div>
+                    <div class="modal-footer">
+                        <button data-dismiss="modal" class="btn btn-default" type="button">关闭</button>
+                        <!--使用ajax post提交数据-->
+                        <button class="btn btn-primary" type="button" id="submit" @click="createElm">导入提交</button>
+                    </div>
+                </div><!-- /.modal-content -->
+            </div><!-- /.modal-dialog -->
+        </div>
+
+
+    </main>
+</div>
+
+
+<footer><div th:replace="include/footer::html" ></div></footer>
+</body>
+</html>

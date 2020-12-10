@@ -1,0 +1,41 @@
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/
+spring:
+  application:
+    name: index-zuul-service
+#设置网关
+#所有的访问 /api-codes/ 的请求，都会自动转到 INDEX-CODES-SERVICE 去。
+#而 INDEX-CODES-SERVICE 有3个端口分别为8011 8012 8013，通过 /api-codes/ 这三个端口都可以任意访问
+#因为这3个微服务是属于一个集群的，所以访问网关会自动在集群里的这些微服务之间进行切换，
+#这样就达到了动态平衡的效果
+#正常访问 http://localhost:8011/codes http://localhost:8012/codes http://localhost:8011/codes
+#网关访问 http://localhost:8031/api-codes/codes
+zuul:
+  routes:
+    #设置指数代码微服务网关
+    api-a:
+      path: /api-codes/**
+      serviceId: INDEX-CODES-SERVICE
+    #设置指数数据微服务网关
+    api-b:
+      path: /api-data/**
+      serviceId: INDEX-DATA-SERVICE
+    #设置回测服务网关
+    api-c:
+      path:  /api-backtest/**
+      serviceId: FEIGN-TRADING-BACKTEST-SERVICE
+    #设置回测视图网关
+    api-d:
+      path: /api-view/**
+      serviceId: FEIGN-TRADING-BACKTEST-VIEW
+
+#链路追踪地址
+  zipkin:
+    base-url: http://localhost:9411
+
+
+
+
+

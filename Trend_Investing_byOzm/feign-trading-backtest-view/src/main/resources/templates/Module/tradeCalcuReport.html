@@ -1,0 +1,38 @@
+<!--分析报告区域-->
+    <table  th:fragment="html_win" v-for="winReport in AnalyseReport.winReport" class="table table-bordered table-condensed">
+        <thead>
+        <th align="center" colspan="2">拟合："胜率"分析报告</th>
+        </thead>
+        <tbody>
+        <tr> <!--均线：ma 购买阈值：analyse_buyRate  出售阈值：analyse_sellRate-->
+            <td width="50%">{{AnalyseReport.indexes.name}}-{{AnalyseReport.indexes.code}} 胜率 “最优” 标准量组合</td>
+            <td><button  type="button" class="btn btn btn-sm btn-success">MA(均线) :{{AnalyseReport.ma}}</button>
+                <button  type="button" class="btn btn btn-sm btn-info">购买阈值 :{{winReport.analyse_buyRate}}</button>
+                <button  type="button" class="btn btn btn-sm btn-warning">出售阈值 :{{winReport.analyse_sellRate}}</button>
+            </td>
+        </tr>
+        <tr>
+            <td>胜率</td>
+            <td>{{winReport.winRate}}%</td>
+        </tr>
+        </tbody>
+    </table>
+
+    <table  th:fragment="html_avg" v-for="avgReport in AnalyseReport.avgProfitReport" class="table table-bordered table-condensed">
+        <thead>
+        <th align="center" colspan="2">拟合："平均盈利率" 分析报告</th>
+        </thead>
+        <tbody>
+        <tr> <!--均线：ma 购买阈值：analyse_buyRate  出售阈值：analyse_sellRate-->
+            <td width="50%">{{AnalyseReport.indexes.name}}-{{AnalyseReport.indexes.code}}平均盈利率 “最优” 标准量组合</td>
+            <td><button  type="button" class="btn btn btn-sm btn-success">MA(均线) :{{AnalyseReport.ma}}</button>
+                <button  type="button" class="btn btn btn-sm btn-info">购买阈值 :{{avgReport.analyse_buyRate}}</button>
+                <button  type="button" class="btn btn btn-sm btn-warning">出售阈值 :{{avgReport.analyse_sellRate}}</button>
+            </td>
+        </tr>
+        <tr>
+            <td>平均盈利率</td>
+            <td>{{avgReport.winRate}}%</td>
+        </tr>
+        </tbody>
+    </table>

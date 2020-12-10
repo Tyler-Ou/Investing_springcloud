@@ -1,0 +1,9 @@
+#声明eureka属性
+eurka:
+  intance:
+    hostname: localhost
+  client:
+    registerWithEureka: false #表示是否注册到服务器，本身就是服务器所以不用注册
+    fetchRegistry: false #表示是否获取服务器的注册信息，和上面同理，这里也设置为 false。
+    defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/ #自己作为服务器，公布出来的地址。
+    #比如后续某个微服务要把自己注册到 eureka server, 那么就要使用这个地址： http://localhost:8761/eureka/

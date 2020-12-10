@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="include/header::html('量化投资：计算系统')" ></head>
+<script>
+    $(function () {
+        var data4Vue = {
+            indexes: [], //指数代码
+            currentIndex: '沪深300-000300', //双向绑定 默认指数名称代码
+            code:"",
+            z_name:"",
+
+            ma:5,//默认5均日
+            buyThreshold:1.01,//买入阈值
+            sellThreshold:0.95,//卖出阈值
+            serviceCharge:0.0,//手续费
+        };
+
+        var vue = new Vue({
+            el:"#workingArea",
+            data:data4Vue,
+            mounted:function () { //vue加载完成后触发该方法
+                this.init();
+                //悬停信息提示
+                $("[data-toggle='tooltip']").tooltip();
+            },
+            methods:{
+                init:function () {
+                    var prefix_zuul = "http://127.0.0.1:8031";
+                    var address_codes = "/api-codes/codes";
+                    var url = prefix_zuul + address_codes;
+                    axios.get(url).then(function (response) {
+                        vue.indexes = response.data;
+                        //声明回调，当获取到数据后，并在页面上选择完数据后该方法被调用
+                        vue.$nextTick(function(){
+                            //获取对应指数代码的指数数据，因为在指数代码的html标签上有双向绑定的code
+                            //所以可以很轻易地获取到指数代码对应的指数数据
+                            vue.simulate();
+                        });
+                    })
+                },
+
+                simulate:function(){
+                    var prefix_zuul = "http://127.0.0.1:8031";
+                    var address_backtest = "/api-backtest/simulate/"; //指数回测服务
+                    vue.code  =  vue.currentIndex.split('-')[1]; //双向绑定选中的指数对应的code option~ :value
+                    vue.z_name = vue.currentIndex.split('-')[0];
+                    //根据收盘价、ma、购入阈值和卖出阈值估算收益率(单组数据)
+                    var url = prefix_zuul + address_backtest + vue.code+"/"+vue.ma+"/"+vue.buyThreshold+"/"+vue.sellThreshold+"/"+vue.serviceCharge+"/"+vue.startDate+"/"+vue.endDate;
+                    axios.get(url).then(function (response) {
+
+
+
+                    })
+
+
+
+                },
+
+                changeParam:function(){
+
+
+                },
+
+                changeParamWithFlushDate:function () {
+
+                }
+
+            }
+        })
+
+
+
+    })
+
+
+
+
+</script>
+
+<style>
+    table.inputTable{
+        width:100%;
+    }
+    table.inputTable td{
+        padding:20px 20px;
+    }
+
+    table{
+        margin:20px;
+    }
+
+    div#workingArea{
+        margin:50px;
+    }
+</style>
+<body>
+    <div id="workingArea">
+        <table th:replace="Module/AnalyseCalculateResult::html"></table>
+    </div>
+
+    <div th:replace="include/footer::html" ></div>
+</body>

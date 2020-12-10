@@ -1,0 +1,173 @@
+<!DOCTYPE html> <!--日期控件:bootstrap-datepicker-->
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="include/header::html('大数据可视化：交易统计-拟合')" ></head>
+<script>
+    //图表制作对象 基于chart.js
+    var chart4Profit = null;
+
+    $(function () {
+
+        var vue4Data={
+            indexes:[],//指数代码
+            name:'沪深300',//指数名称
+            code:'000300',//指数
+            currentIndex:'沪深300-000300',//默认值
+            ma:5,//默认值
+            result:[],
+            profits:[],//收益曲线数据集
+            //用于构建交易明细表
+            t_data: {
+                winCount: 0,//盈利次数
+                lossCount: 0,//亏损次数
+                avgWinRate: 0,//平均盈利率 = 盈利率/盈利次数  盈利率 = 卖出收盘价-买入收盘价/买入收盘价
+                avgLossRate: 0,//平均亏损率  = 亏损率/亏损次数 亏损率 = 卖出收盘价 - 买入收盘价/买入收盘价
+                //标准量
+                analyse_buyRate:0,
+                analyse_sellRate:0,
+                ma:0,
+            }
+        }
+        var vue = new Vue({
+            el:'#workingArea',
+            data:vue4Data,
+            mounted:function () { //加载完成后初始化基础数据
+                //请求基础代码数据
+                this.init();
+                //悬停信息提示
+                $("[data-toggle='tooltip']").tooltip();
+            },
+            methods:{
+                init:function(){
+                    var that = this;
+                    var prefix_zuul = "http://127.0.0.1:8031";
+                    var address_codes = "/api-codes/codes";
+                    var url = prefix_zuul + address_codes;
+                    axios.get(url).then(function (response) {
+                        vue.indexes = response.data;
+                        //声明回调，当获取到数据后，并在页面上选择完数据后该方法被调用
+                        vue.$nextTick(function(){
+                            vue.simulate();
+                        });
+                    })
+                },
+
+                simulate:function () {
+                    //通过网关访问
+                    //@GetMapping("/result/{code}")
+                    var that = this;
+                    that.code  =  that.currentIndex.split('-')[1]; //双向绑定选中的指数对应的code option~ :value
+                    that.name = that.currentIndex.split('-')[0];
+                    var prefix_zuul = "http://127.0.0.1:8031";
+                    var address_codes = "/api-backtest/";
+                    var url = prefix_zuul + address_codes +"tradeResult/"+that.code+"/"+that.ma;
+                    axios.get(url).then(function (response) {
+                        //清空上一次数据
+
+                        // vue.t_data.winCount = [];
+                        // vue.t_data.lossCount = [];
+                        // vue.t_data.avgWinRate = [];
+                        // vue.t_data.avgLossRate = [];
+                        // vue.t_data.analyse_buyRate = [];
+                        // vue.t_data.analyse_sellRate = [];
+                        // vue.t_data.ma = [];
+                        vue.result=[];
+                        vue.t_data = {};//map相同字段无法重装
+
+
+
+
+                        //获得交易统计
+                        //console.log(response.data);
+
+                        //将交易统计封装
+                        for(i in response.data){
+                            vue.t_data.winCount = response.data[i].winCount;
+                            vue.t_data.lossCount = response.data[i].lossCount;
+                            vue.t_data.avgWinRate = response.data[i].avgWinRate;
+                            vue.t_data.avgLossRate = response.data[i].avgLossRate;
+                            vue.t_data.analyse_buyRate = response.data[i].analyse_buyRate;
+                            vue.t_data.analyse_sellRate = response.data[i].analyse_sellRate;
+                            vue.t_data.ma = vue.ma;
+                            vue.result.push(vue.t_data);
+                            vue.t_data = {};//map相同字段无法重装
+                        }
+                        console.log(vue.result);
+                        //交易统计
+                        // vue.winCount = response.data.winCount;
+                        // vue.lossCount = response.data.lossCount;
+                        // vue.avgWinRate = response.data.avgWinRate;
+                        // vue.avgLossRate = response.data.avgLossRate;
+                    })
+                },
+
+                changeParam:function () {
+                    //重新请求数据，由下拉选择框绑定的ma值去获取对应ma值的数据，默认为5
+                    vue.simulate();
+                },
+                changeParamWithFlushDate:function () {
+                    vue.simulate();
+                }
+            }
+        })
+
+
+
+    })
+
+
+    //获取上一页的参数
+    function getUrlParms(para){
+        var search=location.search; //页面URL的查询部分字符串
+        var arrPara=new Array(); //参数数组。数组单项为包含参数名和参数值的字符串，如“para=value”
+        var arrVal=new Array(); //参数值数组。用于存储查找到的参数值
+
+        if(search!=""){
+            var index=0;
+            search=search.substr(1); //去除开头的“?”
+            arrPara=search.split("&");
+
+            for(i in arrPara){
+                var paraPre=para+"="; //参数前缀。即参数名+“=”，如“para=”
+                if(arrPara[i].indexOf(paraPre)==0&& paraPre.length<arrPara[i].length){
+                    arrVal[index]=decodeURI(arrPara[i].substr(paraPre.length)); //顺带URI解码避免出现乱码
+                    index++;
+                }
+            }
+        }
+
+        if(arrVal.length==1){
+            return arrVal[0];
+        }else if(arrVal.length==0){
+            return null;
+        }else{
+            return arrVal;
+        }
+    }
+
+
+
+</script>
+<style>
+    table.inputTable{
+        width:100%;
+    }
+    table.inputTable td{
+        padding:20px 20px;
+    }
+
+    table{
+        margin:20px;
+    }
+
+    div#workingArea{
+        margin:50px;
+    }
+</style>
+
+
+<body>
+    <div id="workingArea">
+
+    </div>
+    <div th:replace="include/footer::html" ></div>
+</body>

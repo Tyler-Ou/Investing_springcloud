@@ -1,0 +1,32 @@
+<script src="https://how2j.cn/study/js/chartjs/2.8.0/chart.min.js"></script>
+<div style="width:400px;margin:0px auto">
+    <canvas id="myChart" ></canvas>
+</div>
+<script>
+
+	//1. 通过 dom 操作获取 myChart 对象的 2d 上下文：
+	var ctx = document.getElementById('myChart').getContext('2d');
+	//基于 ctx Chart对象，创建Chart对象 并传递对应参数进去
+	var myChart = new Chart(ctx,{
+		type: 'line', //line代表是一个线型图标，如果要使用柱状图修改为bar即可
+		data:{ //提供要展示的数据
+			labels:['红', '蓝', '黄', '绿', '紫', '橙'],//横坐标文字
+			datasets:[{
+				label: '示例', //这组数据的名称
+				data: [12,19,3,5,2,3], //具体数据
+				borderColor:'blue',//线条颜色
+				borderWidth:1,//线条宽度
+				fill: false, //是否填充
+			}]
+		},
+		options:{ //其他选项
+			tooltips:{ //鼠标移动在图标上（数据点）显示的信息
+ 					intersect: false, //鼠标不在图标上也会提示信息
+                    mode: 'index' //显示模式
+			}
+
+		}	
+
+	});
+
+</script>

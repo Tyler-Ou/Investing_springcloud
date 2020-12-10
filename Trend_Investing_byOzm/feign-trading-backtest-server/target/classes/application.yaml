@@ -1,0 +1,19 @@
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/
+spring:
+  application:
+    name:  feign-trading-backtest-service
+    thymeleaf:
+      mode: LEGACYHTML5
+      encoding: UTF-8
+      cache: false
+      servlet:
+        content-type: text/html
+#开启 feign 模式的断路器
+feign.hystrix.enabled: true
+
+#链路追踪地址
+zipkin:
+  base-url: http://localhost:9411

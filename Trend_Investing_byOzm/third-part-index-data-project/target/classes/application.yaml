@@ -1,0 +1,7 @@
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/ #这段表示注册中心的地址是 http://localhost:8761/eureka/
+spring:
+  application:
+    name: third-part-index-data-project #声明到注册中心上该微服务的名称

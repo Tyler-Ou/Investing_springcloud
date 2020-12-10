@@ -1,0 +1,11 @@
+{
+  "hints": [],
+  "groups": [
+    {
+      "sourceType": "org.ozm.trend.config.RedisCacheConfig",
+      "name": "spring.cache.redis",
+      "type": "org.ozm.trend.config.RedisCacheConfig"
+    }
+  ],
+  "properties": []
+}

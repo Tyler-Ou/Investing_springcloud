@@ -1,0 +1,32 @@
+<!--交易统计区域-->
+<table th:fragment="html" class="table table-bordered table-condensed">
+    <thead>
+    <th align="center" colspan="2">趋势投资盈亏统计</th>
+    </thead>
+    <tbody>
+    <tr>
+        <td width="50%">总共交易次数</td>
+        <td>{{winCount+lossCount}}</td>
+    </tr>
+    <tr>
+        <td>盈利交易次数</td>
+        <td>{{winCount}}</td>
+    </tr>
+    <tr>
+        <td>平均盈利比率</td>
+        <td>{{avgWinRate*100|formatNumberFilter(2)}}%</td>
+    </tr>
+    <tr>
+        <td>亏损交易次数</td>
+        <td>{{lossCount}}</td>
+    </tr>
+    <tr>
+        <td>平均亏损比率</td>
+        <td>{{avgLossRate*100|formatNumberFilter(2)}}%</td>
+    </tr>
+    <tr>
+        <td>胜率</td>
+        <td>{{(winCount/(winCount+lossCount))*100|formatNumberFilter(2)}}%	</td>
+    </tr>
+    </tbody>
+</table>
